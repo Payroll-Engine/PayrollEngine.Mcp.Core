@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<AssemblyName>PayrollEngine.Mcp.Core</AssemblyName>
+		<RootNamespace>PayrollEngine.Mcp.Core</RootNamespace>
+		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+		<Description>Payroll Engine MCP core infrastructure</Description>
+		<IsPackable>true</IsPackable>
+		<PackageId>PayrollEngine.Mcp.Core</PackageId>
+	</PropertyGroup>
+
+	<!-- help file generation -->
+	<PropertyGroup>
+		<DocumentationFile>$(AssemblyName).xml</DocumentationFile>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="ModelContextProtocol" Version="1.1.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.5" />
+		<PackageReference Include="PayrollEngine.Client.Core" Version="0.10.0-beta.dev" />
+	</ItemGroup>
+
+		<!-- include xml documention files and json schemas to the nuget package -->
+	<ItemGroup>
+		<None Include="$(OutputDir)*.xml" Pack="true">
+			<PackageCopyToOutput>true</PackageCopyToOutput>
+		</None>
+		<None Include="$(OutputDir)*.schema.json" Pack="true">
+			<PackageCopyToOutput>true</PackageCopyToOutput>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Include="..\README.md">
+	    <Pack>True</Pack>
+	    <PackagePath>\</PackagePath>
+	  </None>
+	</ItemGroup>
+
+	<!-- publish package -->
+	<Target Name="PublishPackage" AfterTargets="Pack" Condition="exists('$(PayrollEnginePackageDir)')">
+		<Message Importance="High" Text="Publish package..." />
+		<Copy SourceFiles="$(OutputPath)..\$(PackageId).$(PackageVersion).nupkg" DestinationFolder="$(PayrollEnginePackageDir)" />
+	</Target>
+
+</Project>

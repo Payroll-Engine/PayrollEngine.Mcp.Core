@@ -1,0 +1,331 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>PayrollEngine.Mcp.Core</name>
+    </assembly>
+    <members>
+        <member name="T:PayrollEngine.Mcp.Core.Isolation.IsolationContext">
+            <summary>Holds the active data isolation and permission configuration for the MCP server session.
+            Registered as a singleton; populated from McpServer appsettings on startup.</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.IsolationContext.Level">
+            <summary>Active isolation level. Defaults to MultiTenant.</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.IsolationContext.TenantIdentifier">
+            <summary>Tenant identifier used when Level is Tenant, Division, or Employee.
+            All tool calls are automatically scoped to this tenant.</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.IsolationContext.DivisionName">
+            <summary>Division name used when Level is Division.
+            All tool calls are automatically scoped to this division within the configured tenant.</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.IsolationContext.EmployeeIdentifier">
+            <summary>Employee identifier used when Level is Employee.
+            All tool calls are automatically scoped to this employee within the configured tenant.</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.IsolationContext.PreviewUserIdentifier">
+            <summary>User identifier used as the service account for payrun preview and report execution.
+            Required when the get_employee_pay_preview or execute_payroll_report tool is used.
+            The user must exist in the target tenant.</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.IsolationContext.Permissions">
+            <summary>Role permission levels for this deployment.
+            Defaults to Full for all roles when absent from configuration.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.Isolation.IsolationContext.Validate">
+            <summary>Validates the isolation context at startup.
+            Throws if configuration is incomplete or uses an invalid combination.</summary>
+        </member>
+        <member name="T:PayrollEngine.Mcp.Core.Isolation.IsolationLevel">
+            <summary>Data isolation level for the MCP server.
+            Controls which tenants, divisions, and employees are accessible within a session.</summary>
+        </member>
+        <member name="F:PayrollEngine.Mcp.Core.Isolation.IsolationLevel.MultiTenant">
+            <summary>Full access across all tenants. No automatic scoping is applied.</summary>
+        </member>
+        <member name="F:PayrollEngine.Mcp.Core.Isolation.IsolationLevel.Tenant">
+            <summary>Access restricted to a single tenant configured at startup via McpServer:TenantIdentifier.</summary>
+        </member>
+        <member name="F:PayrollEngine.Mcp.Core.Isolation.IsolationLevel.Division">
+            <summary>Access restricted to a single division within a tenant.
+            Requires McpServer:TenantIdentifier and McpServer:DivisionName.</summary>
+        </member>
+        <member name="F:PayrollEngine.Mcp.Core.Isolation.IsolationLevel.Employee">
+            <summary>Access restricted to a single employee — self-service scenarios.
+            Requires McpServer:TenantIdentifier and McpServer:EmployeeIdentifier.</summary>
+        </member>
+        <member name="T:PayrollEngine.Mcp.Core.Isolation.McpPermission">
+            <summary>Access level granted for a role in this MCP Server deployment.
+            Ordered: None &lt; Read — use &gt;= comparisons for minimum permission checks.
+            The MCP Server is read-only by design: no write tools are registered regardless of configuration.</summary>
+        </member>
+        <member name="F:PayrollEngine.Mcp.Core.Isolation.McpPermission.None">
+            <summary>Role tools are not registered — invisible to the AI agent.</summary>
+        </member>
+        <member name="F:PayrollEngine.Mcp.Core.Isolation.McpPermission.Read">
+            <summary>Read and query tools only. The MCP Server is read-only by design.</summary>
+        </member>
+        <member name="T:PayrollEngine.Mcp.Core.Isolation.McpPermissions">
+            <summary>Permission levels per role for this MCP Server deployment.
+            Populated from McpServer:Permissions in appsettings.json or environment variables.
+            Default when the Permissions section is absent: Read for all roles.
+            The MCP Server is read-only by design — no write tools exist.</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.McpPermissions.HR">
+            <summary>Permission for HR tools (divisions, employees, case values).</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.McpPermissions.Payroll">
+            <summary>Permission for Payroll tools (payrolls, payruns, jobs, temporal queries).</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.McpPermissions.Report">
+            <summary>Permission for Report tools (payroll report execution).</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.McpPermissions.System">
+            <summary>Permission for System tools (tenant and user queries).</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.Isolation.McpPermissions.GetPermission(PayrollEngine.Mcp.Core.Isolation.McpRole)">
+            <summary>Returns the permission granted for the given role.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.Isolation.McpPermissions.IsGranted(PayrollEngine.Mcp.Core.Isolation.McpRole,PayrollEngine.Mcp.Core.Isolation.McpPermission)">
+            <summary>Returns true if the given role is granted at least the required permission.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.Isolation.McpPermissions.FromConfiguration(Microsoft.Extensions.Configuration.IConfiguration)">
+            <summary>Reads McpServer:Permissions from configuration.
+            Returns a fully-read instance when the section is absent.</summary>
+        </member>
+        <member name="T:PayrollEngine.Mcp.Core.Isolation.McpRole">
+            <summary>Functional domain to which a tool class belongs.
+            Each tool class is assigned to exactly one role.</summary>
+        </member>
+        <member name="F:PayrollEngine.Mcp.Core.Isolation.McpRole.HR">
+            <summary>Employee master data and organisational structure:
+            divisions, employees, case values.</summary>
+        </member>
+        <member name="F:PayrollEngine.Mcp.Core.Isolation.McpRole.Payroll">
+            <summary>Payroll execution and result verification:
+            payrolls, payruns, payrun jobs, temporal case value queries.</summary>
+        </member>
+        <member name="F:PayrollEngine.Mcp.Core.Isolation.McpRole.Report">
+            <summary>Payroll report execution and result analysis.</summary>
+        </member>
+        <member name="F:PayrollEngine.Mcp.Core.Isolation.McpRole.System">
+            <summary>Tenant and user management.</summary>
+        </member>
+        <member name="T:PayrollEngine.Mcp.Core.Isolation.ToolRoleAttribute">
+            <summary>Declares the role and minimum permission required to register a tool class.
+            Applied to classes decorated with [McpServerToolType].
+            Tool classes without this attribute are always registered regardless of permissions.</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.ToolRoleAttribute.Role">
+            <summary>The functional domain this tool class belongs to.</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.ToolRoleAttribute.Required">
+            <summary>Minimum permission level required to register this tool class.
+            Defaults to Read.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.Isolation.ToolRoleAttribute.#ctor(PayrollEngine.Mcp.Core.Isolation.McpRole,PayrollEngine.Mcp.Core.Isolation.McpPermission)">
+            <param name="role">The role this tool class belongs to.</param>
+            <param name="required">Minimum permission to register. Default: Read.</param>
+        </member>
+        <member name="T:PayrollEngine.Mcp.Core.ToolBase">
+            <summary>Base class for all MCP tool classes.
+            Provides typed service factories, identifier-to-id resolvers, and uniform error handling.
+            AI agents work exclusively with external string keys (Identifier/Name);
+            internal integer IDs are resolved here before calling id-based service methods.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.#ctor(PayrollEngine.Client.PayrollHttpClient,PayrollEngine.Mcp.Core.Isolation.IsolationContext)">
+            <summary>Base class for all MCP tool classes.
+            Provides typed service factories, identifier-to-id resolvers, and uniform error handling.
+            AI agents work exclusively with external string keys (Identifier/Name);
+            internal integer IDs are resolved here before calling id-based service methods.</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.ToolBase.HttpClient">
+            <summary>The Payroll HTTP client used for backend communication</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.ToolBase.Isolation">
+            <summary>The active data isolation context. Every tool call is filtered through this context.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.ActiveQuery(System.String,System.Nullable{System.Int32},System.String)">
+            <summary>Builds a Query with status=Active filter, optionally combined with an additional OData filter.
+            All list operations use this to exclude inactive objects by default.</summary>
+            <param name="userFilter">Optional additional OData filter from the caller</param>
+            <param name="top">Optional result limit</param>
+            <param name="orderBy">Optional order-by expression</param>
+            <returns>Query with active-only filter</returns>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.ActiveDivisionQuery(System.String,System.Nullable{System.Int32})">
+            <summary>Builds a DivisionQuery with status=Active filter.
+            Required for EmployeeService.QueryAsync which expects DivisionQuery.</summary>
+            <param name="userFilter">Optional additional OData filter from the caller</param>
+            <param name="top">Optional result limit</param>
+            <returns>DivisionQuery with active-only filter</returns>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.IsolatedTenantQuery">
+            <summary>Builds a tenant-scoped active query.
+            In any non-MultiTenant isolation mode, adds an identifier filter so list_tenants
+            only returns the configured tenant.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.IsolatedEmployeeQuery(System.String,System.Nullable{System.Int32})">
+            <summary>Builds an employee-scoped active DivisionQuery.
+            In Employee isolation mode, adds an identifier filter so list_employees only returns the configured employee.
+            In Division isolation mode, no OData division filter is applied because the backend does not support
+            collection lambda expressions (divisions/any()). Division filtering is applied client-side via
+            <see cref="M:PayrollEngine.Mcp.Core.ToolBase.FilterEmployeesByIsolation(System.Collections.Generic.IEnumerable{PayrollEngine.Client.Model.Employee})"/> after the query returns.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.FilterEmployeesByIsolation(System.Collections.Generic.IEnumerable{PayrollEngine.Client.Model.Employee})">
+            <summary>Filters a list of employees client-side to enforce Division isolation.
+            In Division mode, only employees that belong to the configured division are returned.
+            In Employee mode, only the configured employee is returned.
+            In all other modes the list is returned unchanged.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.AssertEmployeeInDivision(PayrollEngine.Client.Model.Employee)">
+            <summary>Validates that an already-resolved employee belongs to the configured division.
+            In Division isolation mode, throws if the employee is not a member of the configured division.
+            In other isolation modes this is a no-op.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.IsolatedDivisionQueryAsync(System.String)">
+            <summary>Builds a division-scoped active query, including Employee isolation support.
+            In Division isolation mode, adds a name filter so list_divisions returns only the configured division.
+            In Employee isolation mode, adds a filter limited to the employee's own division(s).</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.IsolatedPayrollQueryAsync(System.String)">
+            <summary>Builds an active query for payrolls filtered by the isolated division.
+            In Division isolation mode, returns only payrolls belonging to the configured division.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.IsolatedPayrunQueryAsync(System.String)">
+            <summary>Builds an active query for payruns filtered by the isolated division.
+            In Division isolation mode, returns only payruns whose payroll belongs to the configured division.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.Error(System.Exception)">
+            <summary>Serializes a caught exception as a structured JSON error result.
+            All public tool methods must catch exceptions and delegate to this method
+            so the MCP client always receives valid JSON, never a raw exception message.</summary>
+            <param name="exception">The caught exception</param>
+            <returns>JSON: { "error": "...", "type": "..." }</returns>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.TenantService">
+            <summary>Creates a new tenant service</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.UserService">
+            <summary>Creates a new user service</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.DivisionService">
+            <summary>Creates a new division service</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.EmployeeService">
+            <summary>Creates a new employee service</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.RegulationService">
+            <summary>Creates a new regulation service</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.WageTypeService">
+            <summary>Creates a new wage type service</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.LookupService">
+            <summary>Creates a new lookup service</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.LookupValueService">
+            <summary>Creates a new lookup value service</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.PayrollService">
+            <summary>Creates a new payroll service</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.PayrunService">
+            <summary>Creates a new payrun service</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.PayrunJobService">
+            <summary>Creates a new payrun job service</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.PayrollResultService">
+            <summary>Creates a new payroll result service</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.EmployeeCaseValueService">
+            <summary>Creates a new employee case value service</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.CompanyCaseValueService">
+            <summary>Creates a new company case value service</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.EmployeeCaseChangeService">
+            <summary>Creates a new employee case change service</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.CompanyCaseChangeService">
+            <summary>Creates a new company case change service</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.PayrollResultValueService">
+            <summary>Creates a new payroll result value service</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.ReportService">
+            <summary>Creates a new report service</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.PayrollConsolidatedResultService">
+            <summary>Creates a new payroll consolidated result service</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.EffectiveTenant(System.String)">
+            <summary>Returns the effective tenant identifier, enforcing isolation.
+            In Tenant, Division, and Employee modes the configured identifier overrides whatever the AI agent passed.</summary>
+            <param name="tenantIdentifier">Identifier provided by the AI agent</param>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.EffectiveEmployee(System.String)">
+            <summary>Returns the effective employee identifier, enforcing Employee isolation.
+            In Employee mode the configured identifier overrides whatever the AI agent passed.</summary>
+            <param name="employeeIdentifier">Identifier provided by the AI agent</param>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.ResolveIsolatedDivisionIdAsync(System.String)">
+            <summary>Resolves the division id for the active isolation context.
+            In Division mode returns the id of the configured division; otherwise null.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.ResolveTenantAsync(System.String)">
+            <summary>Resolves a tenant by its identifier, applying isolation enforcement.
+            In Tenant mode, the configured tenant identifier always takes precedence.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.ResolveTenantContextAsync(System.String)">
+            <summary>Resolves a TenantServiceContext by tenant identifier</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.ResolveUserAsync(System.String,System.String)">
+            <summary>Resolves a user by tenant identifier and user identifier</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.ResolveDivisionAsync(System.String,System.String)">
+            <summary>Resolves a division by tenant identifier and division name</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.ResolveEmployeeAsync(System.String,System.String)">
+            <summary>Resolves an employee by tenant identifier and employee identifier, applying isolation enforcement.
+            In Employee mode the configured employee identifier always takes precedence.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.ResolveEmployeeContextAsync(System.String,System.String)">
+            <summary>Resolves an EmployeeServiceContext by tenant and employee identifier.
+            Required for EmployeeCaseValueService which needs EmployeeServiceContext.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.ResolveRegulationContextAsync(System.String,System.String)">
+            <summary>Resolves a RegulationServiceContext by tenant identifier and regulation name</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.ResolveLookupContextAsync(System.String,System.String,System.String)">
+            <summary>Resolves a LookupServiceContext by tenant, regulation and lookup name.
+            Required for LookupValueService which needs LookupServiceContext.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.ResolvePayrollContextAsync(System.String,System.String)">
+            <summary>Resolves a PayrollServiceContext by tenant identifier and payroll name</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.ResolveReportAsync(PayrollEngine.Client.Service.PayrollServiceContext,System.String)">
+            <summary>Resolves a ReportSet by payroll context and report name.
+            Returns the topmost derived report across all regulation layers.</summary>
+        </member>
+        <member name="T:PayrollEngine.Mcp.Core.ToolRegistrar">
+            <summary>Filters and registers MCP tool classes based on the active McpPermissions
+            and the active IsolationLevel.
+            Tool classes tagged with [ToolRole] are only registered when:
+              (a) the deployment grants at least the required permission for that role, AND
+              (b) the role is applicable for the active isolation level (per Role x IsolationLevel matrix).
+            Tool classes without [ToolRole] are always registered.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolRegistrar.GetPermittedTypes(System.Reflection.Assembly,PayrollEngine.Mcp.Core.Isolation.McpPermissions,PayrollEngine.Mcp.Core.Isolation.IsolationLevel)">
+            <summary>Returns all tool types from the given assembly that pass the permission
+            and isolation-level compatibility filter.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolRegistrar.IsRoleCompatibleWithIsolationLevel(PayrollEngine.Mcp.Core.Isolation.McpRole,PayrollEngine.Mcp.Core.Isolation.IsolationLevel)">
+            <summary>Returns true when the given role is applicable for the given isolation level.
+            Based on the Role x IsolationLevel matrix defined in README.md:
+            HR: all levels; Payroll: all except Employee;
+            Report and System: MultiTenant and Tenant only.</summary>
+        </member>
+    </members>
+</doc>
