@@ -5,8 +5,7 @@ namespace PayrollEngine.Mcp.Core.Isolation;
 
 /// <summary>Permission levels per role for this MCP Server deployment.
 /// Populated from McpServer:Permissions in appsettings.json or environment variables.
-/// Default when the Permissions section is absent: Read for all roles.
-/// The MCP Server is read-only by design — no write tools exist.</summary>
+/// Default when the Permissions section is absent: Read for all roles.</summary>
 public sealed class McpPermissions
 {
     /// <summary>Permission for HR tools (divisions, employees, case values).</summary>
