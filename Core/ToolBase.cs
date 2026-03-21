@@ -76,11 +76,12 @@ public abstract class ToolBase(PayrollHttpClient httpClient, IsolationContext is
         return ActiveQuery();
     }
 
-    /// <summary>Builds an employee-scoped active DivisionQuery.
-    /// In Employee isolation mode, adds an identifier filter so list_employees only returns the configured employee.
-    /// In Division isolation mode, no OData division filter is applied because the backend does not support
-    /// collection lambda expressions (divisions/any()). Division filtering is applied client-side via
-    /// <see cref="FilterEmployeesByIsolation"/> after the query returns.</summary>
+    /// <summary>Builds an employee-scoped active DivisionQuery with server-side isolation.
+    /// - Employee mode: adds identifier filter — only the configured employee is returned.
+    /// - Division mode: adds a divisions/any() lambda filter — only employees that belong
+    ///   to the configured division are returned. The filter is pushed to the backend SQL
+    ///   via an EXISTS (OPENJSON) sub-query; no client-side post-filtering is required.
+    /// - All other modes: user filter and top are passed through unchanged.</summary>
     protected DivisionQuery IsolatedEmployeeQuery(string userFilter = null, int? top = null)
     {
         if (Isolation.Level == IsolationLevel.Employee &&
@@ -88,33 +89,20 @@ public abstract class ToolBase(PayrollHttpClient httpClient, IsolationContext is
         {
             return ActiveDivisionQuery($"identifier eq '{Isolation.EmployeeIdentifier}'", top);
         }
-        // Division isolation: cannot push filter to backend (divisions/any() not supported).
-        // Caller must apply FilterEmployeesByIsolation() on the result.
-        return ActiveDivisionQuery(userFilter, top);
-    }
 
-    /// <summary>Filters a list of employees client-side to enforce Division isolation.
-    /// In Division mode, only employees that belong to the configured division are returned.
-    /// In Employee mode, only the configured employee is returned.
-    /// In all other modes the list is returned unchanged.</summary>
-    protected System.Collections.Generic.IEnumerable<Employee> FilterEmployeesByIsolation(
-        System.Collections.Generic.IEnumerable<Employee> employees)
-    {
         if (Isolation.Level == IsolationLevel.Division &&
             !string.IsNullOrWhiteSpace(Isolation.DivisionName))
         {
-            return employees.Where(e =>
-                e.Divisions != null &&
-                e.Divisions.Exists(d =>
-                    string.Equals(d, Isolation.DivisionName, StringComparison.OrdinalIgnoreCase)));
+            // Push division filter to backend via OData any() lambda.
+            // Translates to: EXISTS (SELECT 1 FROM OPENJSON([Divisions]) WHERE [value] = @p0)
+            var divisionFilter = $"divisions/any(d: d eq '{Isolation.DivisionName}')";
+            var combinedFilter = string.IsNullOrWhiteSpace(userFilter)
+                ? divisionFilter
+                : new Filter(divisionFilter).And(new Filter(userFilter)).Expression;
+            return ActiveDivisionQuery(combinedFilter, top);
         }
-        if (Isolation.Level == IsolationLevel.Employee &&
-            !string.IsNullOrWhiteSpace(Isolation.EmployeeIdentifier))
-        {
-            return employees.Where(e =>
-                string.Equals(e.Identifier, Isolation.EmployeeIdentifier, StringComparison.OrdinalIgnoreCase));
-        }
-        return employees;
+
+        return ActiveDivisionQuery(userFilter, top);
     }
 
     /// <summary>Validates that an already-resolved employee belongs to the configured division.
@@ -178,7 +166,8 @@ public abstract class ToolBase(PayrollHttpClient httpClient, IsolationContext is
     }
 
     /// <summary>Builds an active query for payruns filtered by the isolated division.
-    /// In Division isolation mode, returns only payruns whose payroll belongs to the configured division.</summary>
+    /// In Division isolation mode, returns only payruns whose payroll belongs to the configured division.
+    /// Multiple payroll IDs are expressed as a single OData in() expression to keep the filter compact.</summary>
     protected async Task<Query> IsolatedPayrunQueryAsync(string tenantIdentifier)
     {
         if (Isolation.Level == IsolationLevel.Division && !string.IsNullOrWhiteSpace(Isolation.DivisionName))
@@ -191,7 +180,10 @@ public abstract class ToolBase(PayrollHttpClient httpClient, IsolationContext is
             {
                 return ActiveQuery("payrollId eq -1"); // no payrolls for this division
             }
-            var filter = string.Join(" or ", ids.Select(id => $"payrollId eq {id}"));
+            // Use OData in() for a compact, readable filter regardless of the number of payrolls
+            var filter = ids.Count == 1
+                ? $"payrollId eq {ids[0]}"
+                : $"payrollId in ({string.Join(",", ids)})";
             return ActiveQuery(filter);
         }
         return ActiveQuery();

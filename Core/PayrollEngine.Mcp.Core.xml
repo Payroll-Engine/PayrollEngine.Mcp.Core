@@ -56,20 +56,23 @@
         </member>
         <member name="T:PayrollEngine.Mcp.Core.Isolation.McpPermission">
             <summary>Access level granted for a role in this MCP Server deployment.
-            Ordered: None &lt; Read — use &gt;= comparisons for minimum permission checks.
-            The MCP Server is read-only by design: no write tools are registered regardless of configuration.</summary>
+            Ordered: None &lt; Read &lt; Write — use &gt;= comparisons for minimum permission checks.</summary>
         </member>
         <member name="F:PayrollEngine.Mcp.Core.Isolation.McpPermission.None">
             <summary>Role tools are not registered — invisible to the AI agent.</summary>
         </member>
         <member name="F:PayrollEngine.Mcp.Core.Isolation.McpPermission.Read">
-            <summary>Read and query tools only. The MCP Server is read-only by design.</summary>
+            <summary>Read and query tools only.</summary>
+        </member>
+        <member name="F:PayrollEngine.Mcp.Core.Isolation.McpPermission.Write">
+            <summary>Read and write tools. Includes all Read tools plus mutation operations
+            (case changes, payrun execution, employee mutations).
+            Available in PayrollEngine.Mcp.Server.Pro only.</summary>
         </member>
         <member name="T:PayrollEngine.Mcp.Core.Isolation.McpPermissions">
             <summary>Permission levels per role for this MCP Server deployment.
             Populated from McpServer:Permissions in appsettings.json or environment variables.
-            Default when the Permissions section is absent: Read for all roles.
-            The MCP Server is read-only by design — no write tools exist.</summary>
+            Default when the Permissions section is absent: Read for all roles.</summary>
         </member>
         <member name="P:PayrollEngine.Mcp.Core.Isolation.McpPermissions.HR">
             <summary>Permission for HR tools (divisions, employees, case values).</summary>
