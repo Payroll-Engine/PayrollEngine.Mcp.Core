@@ -10,7 +10,8 @@ namespace PayrollEngine.Mcp.Core;
 /// and the active IsolationLevel.
 /// Tool classes tagged with [ToolRole] are only registered when:
 ///   (a) the deployment grants at least the required permission for that role, AND
-///   (b) the role is applicable for the active isolation level (per Role x IsolationLevel matrix).
+///   (b) the role is applicable for the active isolation level (per Role x IsolationLevel matrix), AND
+///   (c) when RequiredIsolationLevel is set: the active isolation level matches exactly.
 /// Tool classes without [ToolRole] are always registered.</summary>
 public static class ToolRegistrar
 {
@@ -37,9 +38,18 @@ public static class ToolRegistrar
                 continue;
             }
 
-            // Role x IsolationLevel compatibility check (README matrix)
-            if (!IsRoleCompatibleWithIsolationLevel(roleAttr.Role, isolationLevel))
-                continue;
+            // exact isolation level required (overrides the compatibility matrix)
+            if (roleAttr.RequiredIsolationLevel.HasValue)
+            {
+                if (isolationLevel != roleAttr.RequiredIsolationLevel.Value)
+                    continue;
+            }
+            else
+            {
+                // Role x IsolationLevel compatibility check (README matrix)
+                if (!IsRoleCompatibleWithIsolationLevel(roleAttr.Role, isolationLevel))
+                    continue;
+            }
 
             if (permissions.IsGranted(roleAttr.Role, roleAttr.Required))
                 yield return type;

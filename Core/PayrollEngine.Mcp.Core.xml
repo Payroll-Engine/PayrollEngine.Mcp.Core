@@ -126,9 +126,20 @@
             <summary>Minimum permission level required to register this tool class.
             Defaults to Read.</summary>
         </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.ToolRoleAttribute.RequiredIsolationLevel">
+            <summary>When set, the tool class is only registered at exactly this isolation level.
+            Null means the role × isolation-level compatibility matrix applies (default behaviour).</summary>
+        </member>
         <member name="M:PayrollEngine.Mcp.Core.Isolation.ToolRoleAttribute.#ctor(PayrollEngine.Mcp.Core.Isolation.McpRole,PayrollEngine.Mcp.Core.Isolation.McpPermission)">
             <param name="role">The role this tool class belongs to.</param>
             <param name="required">Minimum permission to register. Default: Read.</param>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.Isolation.ToolRoleAttribute.#ctor(PayrollEngine.Mcp.Core.Isolation.McpRole,PayrollEngine.Mcp.Core.Isolation.McpPermission,PayrollEngine.Mcp.Core.Isolation.IsolationLevel)">
+            <param name="role">The role this tool class belongs to.</param>
+            <param name="required">Minimum permission to register.</param>
+            <param name="requiredIsolationLevel">Exact isolation level required.
+            Use this for tools that are only meaningful at a specific isolation level
+            (e.g. consolidation tools require MultiTenant).</param>
         </member>
         <member name="T:PayrollEngine.Mcp.Core.ToolBase">
             <summary>Base class for all MCP tool classes.
@@ -169,17 +180,12 @@
             only returns the configured tenant.</summary>
         </member>
         <member name="M:PayrollEngine.Mcp.Core.ToolBase.IsolatedEmployeeQuery(System.String,System.Nullable{System.Int32})">
-            <summary>Builds an employee-scoped active DivisionQuery.
-            In Employee isolation mode, adds an identifier filter so list_employees only returns the configured employee.
-            In Division isolation mode, no OData division filter is applied because the backend does not support
-            collection lambda expressions (divisions/any()). Division filtering is applied client-side via
-            <see cref="M:PayrollEngine.Mcp.Core.ToolBase.FilterEmployeesByIsolation(System.Collections.Generic.IEnumerable{PayrollEngine.Client.Model.Employee})"/> after the query returns.</summary>
-        </member>
-        <member name="M:PayrollEngine.Mcp.Core.ToolBase.FilterEmployeesByIsolation(System.Collections.Generic.IEnumerable{PayrollEngine.Client.Model.Employee})">
-            <summary>Filters a list of employees client-side to enforce Division isolation.
-            In Division mode, only employees that belong to the configured division are returned.
-            In Employee mode, only the configured employee is returned.
-            In all other modes the list is returned unchanged.</summary>
+            <summary>Builds an employee-scoped active DivisionQuery with server-side isolation.
+            - Employee mode: adds identifier filter — only the configured employee is returned.
+            - Division mode: adds a divisions/any() lambda filter — only employees that belong
+              to the configured division are returned. The filter is pushed to the backend SQL
+              via an EXISTS (OPENJSON) sub-query; no client-side post-filtering is required.
+            - All other modes: user filter and top are passed through unchanged.</summary>
         </member>
         <member name="M:PayrollEngine.Mcp.Core.ToolBase.AssertEmployeeInDivision(PayrollEngine.Client.Model.Employee)">
             <summary>Validates that an already-resolved employee belongs to the configured division.
@@ -197,7 +203,8 @@
         </member>
         <member name="M:PayrollEngine.Mcp.Core.ToolBase.IsolatedPayrunQueryAsync(System.String)">
             <summary>Builds an active query for payruns filtered by the isolated division.
-            In Division isolation mode, returns only payruns whose payroll belongs to the configured division.</summary>
+            In Division isolation mode, returns only payruns whose payroll belongs to the configured division.
+            Multiple payroll IDs are expressed as a single OData in() expression to keep the filter compact.</summary>
         </member>
         <member name="M:PayrollEngine.Mcp.Core.ToolBase.Error(System.Exception)">
             <summary>Serializes a caught exception as a structured JSON error result.
@@ -317,7 +324,8 @@
             and the active IsolationLevel.
             Tool classes tagged with [ToolRole] are only registered when:
               (a) the deployment grants at least the required permission for that role, AND
-              (b) the role is applicable for the active isolation level (per Role x IsolationLevel matrix).
+              (b) the role is applicable for the active isolation level (per Role x IsolationLevel matrix), AND
+              (c) when RequiredIsolationLevel is set: the active isolation level matches exactly.
             Tool classes without [ToolRole] are always registered.</summary>
         </member>
         <member name="M:PayrollEngine.Mcp.Core.ToolRegistrar.GetPermittedTypes(System.Reflection.Assembly,PayrollEngine.Mcp.Core.Isolation.McpPermissions,PayrollEngine.Mcp.Core.Isolation.IsolationLevel)">

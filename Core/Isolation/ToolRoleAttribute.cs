@@ -15,11 +15,28 @@ public sealed class ToolRoleAttribute : Attribute
     /// Defaults to Read.</summary>
     public McpPermission Required { get; }
 
+    /// <summary>When set, the tool class is only registered at exactly this isolation level.
+    /// Null means the role × isolation-level compatibility matrix applies (default behaviour).</summary>
+    public IsolationLevel? RequiredIsolationLevel { get; }
+
     /// <param name="role">The role this tool class belongs to.</param>
     /// <param name="required">Minimum permission to register. Default: Read.</param>
     public ToolRoleAttribute(McpRole role, McpPermission required = McpPermission.Read)
     {
         Role = role;
         Required = required;
+        RequiredIsolationLevel = null;
+    }
+
+    /// <param name="role">The role this tool class belongs to.</param>
+    /// <param name="required">Minimum permission to register.</param>
+    /// <param name="requiredIsolationLevel">Exact isolation level required.
+    /// Use this for tools that are only meaningful at a specific isolation level
+    /// (e.g. consolidation tools require MultiTenant).</param>
+    public ToolRoleAttribute(McpRole role, McpPermission required, IsolationLevel requiredIsolationLevel)
+    {
+        Role = role;
+        Required = required;
+        RequiredIsolationLevel = requiredIsolationLevel;
     }
 }
