@@ -38,6 +38,13 @@ jobs:
             --password ${{ secrets.PAT_DISPATCH }} \
             --store-password-in-clear-text
 
+      - name: Update PE dependency versions
+        run: |
+          VERSION=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)
+          find . -name "*.csproj" | xargs sed -i -E \
+            "s|(<PackageReference Include=\"PayrollEngine\.[^\"]*\" Version=\")[^\"]*\"|\1${VERSION}\"|g"
+          echo "✅ PE dependencies patched to ${VERSION}"
+
       - name: Build
         run: dotnet publish Core/PayrollEngine.Mcp.Core.csproj -c Release -o publish
 
