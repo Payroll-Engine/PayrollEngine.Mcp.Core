@@ -1,0 +1,190 @@
+name: Build & Publish NuGet
+
+on:
+  repository_dispatch:
+    types: [release]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version (e.g. 1.5.0 or 1.5.0-beta.1)'
+        required: true
+      dry_run:
+        description: 'Dry run (draft release, no commit, no latest tag)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  DOTNET_VERSION: '10.0.x'
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine parameters
+        id: params
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            VERSION="${{ github.event.client_payload.version }}"
+            IS_PRERELEASE="${{ github.event.client_payload.is_prerelease }}"
+            DRY_RUN="${{ github.event.client_payload.dry_run }}"
+          else
+            VERSION="${{ inputs.version }}"
+            DRY_RUN="${{ inputs.dry_run }}"
+            if [[ "$VERSION" == *-* ]]; then
+              IS_PRERELEASE="true"
+            else
+              IS_PRERELEASE="false"
+            fi
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "is_prerelease=${IS_PRERELEASE}" >> $GITHUB_OUTPUT
+          echo "dry_run=${DRY_RUN}" >> $GITHUB_OUTPUT
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "make_draft=true" >> $GITHUB_OUTPUT
+          else
+            echo "make_draft=false" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_DISPATCH }}
+          fetch-depth: 0
+
+      # ── Version Guard ────────────────────────────────
+      - name: Check if version already exists
+        if: steps.params.outputs.dry_run != 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PAT_DISPATCH }}
+          script: |
+            const version = '${{ steps.params.outputs.version }}';
+            const tag = `v${version}`;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const errors = [];
+            try {
+              await github.rest.git.getRef({ owner, repo, ref: `tags/${tag}` });
+              errors.push(`Git tag '${tag}' already exists`);
+            } catch (e) { if (e.status !== 404) throw e; }
+            try {
+              await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+              errors.push(`GitHub Release '${tag}' already exists`);
+            } catch (e) { if (e.status !== 404) throw e; }
+            try {
+              const packages = await github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
+                package_type: 'nuget', package_name: repo, org: owner
+              });
+              if (packages.data.some(p => p.name === version))
+                errors.push(`NuGet package version '${version}' already exists on GitHub Packages`);
+            } catch (e) {
+              if (e.status === 404) console.log(`✅ No package found yet (first publish)`);
+              else console.warn(`⚠️ Could not check packages: ${e.message}`);
+            }
+            if (errors.length > 0)
+              core.setFailed(`❌ Version guard failed:\n${errors.map(e => `  - ${e}`).join('\n')}`);
+            else
+              console.log('\n✅ All version checks passed');
+
+      # ── Update Directory.Build.props ─────────────────
+      - name: Read current version
+        id: current
+        run: |
+          CURRENT=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)
+          echo "version=${CURRENT}" >> $GITHUB_OUTPUT
+
+      - name: Update Directory.Build.props
+        run: |
+          VERSION="${{ steps.params.outputs.version }}"
+          CURRENT="${{ steps.current.outputs.version }}"
+          if [ "${VERSION}" = "${CURRENT}" ]; then
+            echo "ℹ️ Version already set to ${VERSION}"
+          else
+            sed -i "s|<Version>${CURRENT}</Version>|<Version>${VERSION}</Version>|" Directory.Build.props
+            echo "✅ Updated: ${CURRENT} → ${VERSION}"
+          fi
+          grep '<Version>' Directory.Build.props
+
+      - name: Commit version bump
+        if: steps.params.outputs.dry_run != 'true'
+        run: |
+          VERSION="${{ steps.params.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Directory.Build.props
+          if git diff --cached --quiet; then
+            echo "ℹ️ No changes to commit"
+          else
+            git commit -m "release: v${VERSION}"
+            git push
+          fi
+
+      # ── Build ────────────────────────────────────────
+      - name: Update PE dependency versions
+        run: |
+          VERSION="${{ steps.params.outputs.version }}"
+          find . -name "*.csproj" | xargs sed -i -E \
+            "s|(<PackageReference Include=\"PayrollEngine\.[^\"]*\" Version=\")[^\"]*\"|\1${VERSION}\"|g"
+          echo "✅ PE dependencies updated to ${VERSION}"
+          grep -rh 'PayrollEngine\.' --include="*.csproj" | grep 'Version=' || true
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Configure GitHub Packages source
+        run: |
+          dotnet nuget add source \
+            "https://nuget.pkg.github.com/Payroll-Engine/index.json" \
+            --name github \
+            --username github-actions \
+            --password ${{ secrets.PAT_DISPATCH }} \
+            --store-password-in-clear-text
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test --configuration Release --no-build --verbosity normal
+
+      - name: Pack
+        run: dotnet pack --configuration Release --no-build --output ./nupkgs
+
+      # ── Publish ──────────────────────────────────────
+      - name: Publish to GitHub Packages
+        run: |
+          dotnet nuget push ./nupkgs/*.nupkg \
+            --source "https://nuget.pkg.github.com/Payroll-Engine/index.json" \
+            --api-key ${{ secrets.GITHUB_TOKEN }} \
+            --skip-duplicate
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.params.outputs.version }}
+          name: v${{ steps.params.outputs.version }}
+          prerelease: ${{ steps.params.outputs.is_prerelease }}
+          draft: ${{ steps.params.outputs.make_draft }}
+          generate_release_notes: true
+          files: ./nupkgs/*.nupkg
+
+      - name: Notify orchestrator
+        if: github.event_name == 'repository_dispatch'
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.PAT_DISPATCH }}
+          repository: Payroll-Engine/PayrollEngine
+          event-type: lib-published
+          client-payload: >-
+            {
+              "repo": "${{ github.repository }}",
+              "version": "${{ steps.params.outputs.version }}",
+              "wave": "${{ github.event.client_payload.wave }}"
+            }
