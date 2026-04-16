@@ -123,13 +123,6 @@ jobs:
           fi
 
       # ── Build ────────────────────────────────────────
-      - name: Update PE dependency versions
-        run: |
-          VERSION="${{ steps.params.outputs.version }}"
-          find . -name "*.csproj" | xargs sed -i -E \
-            "s|(<PackageReference Include=\"PayrollEngine\.[^\"]*\" Version=\")[^\"]*\"|\1${VERSION}\"|g"
-          echo "✅ PE dependencies updated to ${VERSION}"
-          grep -rh 'PayrollEngine\.' --include="*.csproj" | grep 'Version=' || true
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
