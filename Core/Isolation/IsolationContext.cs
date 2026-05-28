@@ -26,6 +26,13 @@ public sealed class IsolationContext
     /// The user must exist in the target tenant.</summary>
     public string PreviewUserIdentifier { get; init; }
 
+    /// <summary>Shared secret for HMAC-SHA256 response signing.
+    /// When set, tools that opt in wrap their JSON response in a signed envelope
+    /// so recipients can verify data integrity independent of the transport.
+    /// Can be provided via McpServer:IntegrityKey in appsettings.json
+    /// or via the PayrollIntegrityKey environment variable.</summary>
+    public string IntegrityKey { get; init; }
+
     /// <summary>Role permission levels for this deployment.
     /// Defaults to Full for all roles when absent from configuration.</summary>
     public McpPermissions Permissions { get; init; } = new();

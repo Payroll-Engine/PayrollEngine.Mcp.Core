@@ -28,6 +28,13 @@
             Required when the get_employee_pay_preview or execute_payroll_report tool is used.
             The user must exist in the target tenant.</summary>
         </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.IsolationContext.IntegrityKey">
+            <summary>Shared secret for HMAC-SHA256 response signing.
+            When set, tools that opt in wrap their JSON response in a signed envelope
+            so recipients can verify data integrity independent of the transport.
+            Can be provided via McpServer:IntegrityKey in appsettings.json
+            or via the PayrollIntegrityKey environment variable.</summary>
+        </member>
         <member name="P:PayrollEngine.Mcp.Core.Isolation.IsolationContext.Permissions">
             <summary>Role permission levels for this deployment.
             Defaults to Full for all roles when absent from configuration.</summary>
@@ -212,6 +219,14 @@
             so the MCP client always receives valid JSON, never a raw exception message.</summary>
             <param name="exception">The caught exception</param>
             <returns>JSON: { "error": "...", "type": "..." }</returns>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.SignWithIntegrity(System.String)">
+            <summary>Wraps a JSON result in an HMAC-SHA256 signed envelope when IntegrityKey is configured.
+            Returns the original JSON unchanged when no key is set (backward compatible).
+            The recipient verifies the signature by recomputing HMAC-SHA256 over the data JSON
+            with the same shared secret.</summary>
+            <param name="dataJson">Serialized JSON payload to sign</param>
+            <returns>Original JSON (no key) or signed envelope JSON</returns>
         </member>
         <member name="M:PayrollEngine.Mcp.Core.ToolBase.TenantService">
             <summary>Creates a new tenant service</summary>

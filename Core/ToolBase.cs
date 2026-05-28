@@ -1,5 +1,7 @@
 using System;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using PayrollEngine.Client;
@@ -203,6 +205,44 @@ public abstract class ToolBase(PayrollHttpClient httpClient, IsolationContext is
         var message = exception.GetBaseException().Message;
         var type = exception.GetBaseException().GetType().Name;
         return JsonSerializer.Serialize(new { error = message, type });
+    }
+
+    #endregion
+
+    #region Integrity signing
+
+    /// <summary>Wraps a JSON result in an HMAC-SHA256 signed envelope when IntegrityKey is configured.
+    /// Returns the original JSON unchanged when no key is set (backward compatible).
+    /// The recipient verifies the signature by recomputing HMAC-SHA256 over the data JSON
+    /// with the same shared secret.</summary>
+    /// <param name="dataJson">Serialized JSON payload to sign</param>
+    /// <returns>Original JSON (no key) or signed envelope JSON</returns>
+    protected string SignWithIntegrity(string dataJson)
+    {
+        if (string.IsNullOrWhiteSpace(Isolation.IntegrityKey))
+        {
+            return dataJson;
+        }
+
+        var keyBytes = Encoding.UTF8.GetBytes(Isolation.IntegrityKey);
+        var dataBytes = Encoding.UTF8.GetBytes(dataJson);
+        var hash = HMACSHA256.HashData(keyBytes, dataBytes);
+        var signature = Convert.ToBase64String(hash)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+
+        var envelope = new
+        {
+            data = JsonSerializer.Deserialize<JsonElement>(dataJson),
+            integrity = new
+            {
+                algorithm = "HMAC-SHA256",
+                signature,
+                timestamp = DateTime.UtcNow.ToString("o")
+            }
+        };
+        return JsonSerializer.Serialize(envelope);
     }
 
     #endregion
