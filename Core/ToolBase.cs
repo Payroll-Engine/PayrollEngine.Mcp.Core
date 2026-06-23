@@ -249,6 +249,9 @@ public abstract class ToolBase(PayrollHttpClient httpClient, IsolationContext is
 
     #region Service factories
 
+    /// <summary>Creates a new admin service</summary>
+    protected AdminService AdminService() => new(HttpClient);
+
     /// <summary>Creates a new tenant service</summary>
     protected TenantService TenantService() => new(HttpClient);
 

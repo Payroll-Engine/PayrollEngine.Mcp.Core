@@ -228,6 +228,9 @@
             <param name="dataJson">Serialized JSON payload to sign</param>
             <returns>Original JSON (no key) or signed envelope JSON</returns>
         </member>
+        <member name="M:PayrollEngine.Mcp.Core.ToolBase.AdminService">
+            <summary>Creates a new admin service</summary>
+        </member>
         <member name="M:PayrollEngine.Mcp.Core.ToolBase.TenantService">
             <summary>Creates a new tenant service</summary>
         </member>
