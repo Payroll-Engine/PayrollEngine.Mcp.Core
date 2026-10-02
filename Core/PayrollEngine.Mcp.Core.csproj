@@ -19,7 +19,7 @@
 	<ItemGroup>
 		<PackageReference Include="ModelContextProtocol" Version="2.2.0" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.12" />
-		<PackageReference Include="PayrollEngine.Client.Core" Version="$(PayrollEngineVersion)" />
+		<PackageReference Include="PayrollEngine.Client.Core" Version="$(Version)" />
 	</ItemGroup>
 
 		<!-- include xml documention files and json schemas to the nuget package -->
