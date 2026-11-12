@@ -21,6 +21,10 @@ public sealed class McpPermissions
     /// <summary>Permission for System tools (tenant and user queries).</summary>
     public McpPermission System { get; init; } = McpPermission.Read;
 
+    /// <summary>Permission for Regulator tools (file based regulation authoring).
+    /// Defaults to None; must be granted explicitly via McpServer:Permissions:Regulator.</summary>
+    public McpPermission Regulator { get; init; } = McpPermission.None;
+
     /// <summary>Returns the permission granted for the given role.</summary>
     private McpPermission GetPermission(McpRole role) => role switch
     {
@@ -28,6 +32,7 @@ public sealed class McpPermissions
         McpRole.Payroll => Payroll,
         McpRole.Report  => Report,
         McpRole.System  => System,
+        McpRole.Regulator => Regulator,
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, null)
     };
 
@@ -48,7 +53,8 @@ public sealed class McpPermissions
             HR      = ParsePermission(section["HR"]),
             Payroll = ParsePermission(section["Payroll"]),
             Report  = ParsePermission(section["Report"]),
-            System  = ParsePermission(section["System"])
+            System  = ParsePermission(section["System"]),
+            Regulator = ParsePermission(section["Regulator"])
         };
     }
 

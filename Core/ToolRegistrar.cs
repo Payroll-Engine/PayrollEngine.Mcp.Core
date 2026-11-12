@@ -59,7 +59,7 @@ public static class ToolRegistrar
     /// <summary>Returns true when the given role is applicable for the given isolation level.
     /// Based on the Role x IsolationLevel matrix defined in README.md:
     /// HR: all levels; Payroll: all except Employee;
-    /// Report and System: MultiTenant and Tenant only.</summary>
+    /// Report, System and Regulator: MultiTenant and Tenant only.</summary>
     private static bool IsRoleCompatibleWithIsolationLevel(McpRole role, IsolationLevel level) =>
         (role, level) switch
         {
@@ -79,6 +79,11 @@ public static class ToolRegistrar
             (McpRole.System, IsolationLevel.MultiTenant) => true,
             (McpRole.System, IsolationLevel.Tenant)      => true,
             (McpRole.System, _) => false,
+
+            // Regulator: file based tools, valid without data isolation to a single division or employee
+            (McpRole.Regulator, IsolationLevel.MultiTenant) => true,
+            (McpRole.Regulator, IsolationLevel.Tenant)      => true,
+            (McpRole.Regulator, _) => false,
 
             _ => true
         };

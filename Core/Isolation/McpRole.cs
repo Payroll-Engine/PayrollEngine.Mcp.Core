@@ -17,5 +17,8 @@ public enum McpRole
     Report,
 
     /// <summary>Tenant and user management.</summary>
-    System
+    System,
+
+    /// <summary>Regulation authoring: file based regulation and data satellite tools.</summary>
+    Regulator
 }

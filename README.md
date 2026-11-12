@@ -92,6 +92,7 @@ Controls **which tools** are registered at startup. Each tool class is tagged wi
 | `Payroll` | Payroll execution and results |
 | `Report` | Report execution |
 | `System` | Tenant and user management |
+| `Regulator` | File based regulation authoring (default permission `None`, granted via `McpServer:Permissions:Regulator`) |
 
 | Permission | Description |
 |:-----------|:------------|
@@ -108,6 +109,7 @@ Controls **which tools** are registered at startup. Each tool class is tagged wi
 | Payroll | ✓ | ✓ | ✓ | ✗ |
 | Report | ✓ | ✓ | ✗ | ✗ |
 | System | ✓ | ✓ | ✗ | ✗ |
+| Regulator | ✓ | ✓ | ✗ | ✗ |
 
 ---
 
