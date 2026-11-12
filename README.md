@@ -82,9 +82,20 @@ Controls **which files** file based tools may access. The workspace is configure
 
 `\` and `/` are both accepted as separators on every platform. Relative paths resolve against the first root containing the path, otherwise against the first root.
 
+### Known path validation limits
+
+Path checks run when a tool resolves the path argument. They do not run again when the tool opens files:
+
+- A symbolic link or junction created **after** a path was accepted can point outside the workspace; another process with write access to the workspace could exploit that race.
+- On Windows, paths may use **8.3 short names** (for example `REPO~1`). The resolver does not normalize short names to their long form; `RepoMask` matches the repository folder name as given in the path.
+
+Deployments should avoid writable links inside the workspace roots and should configure stable long folder names below the roots.
+
 ---
 
 ## Roles and Permissions
+
+When the `McpServer:Permissions` section is absent, `HR`, `Payroll`, `Report` and `System` default to `Read` while `Regulator` defaults to `None` (no file tools).
 
 Controls **which tools** are registered at startup. Each tool class is tagged with a `[ToolRole]` attribute declaring its role and minimum permission. A tool whose role is not granted is never registered — invisible to the AI agent.
 
@@ -149,6 +160,15 @@ Key capabilities:
 | Isolation guards | `FilterEmployeesByIsolation`, `AssertEmployeeInDivision` |
 | Resolvers | `ResolveTenantAsync`, `ResolveEmployeeAsync`, `ResolveDivisionAsync`, `ResolvePayrollContextAsync`, `ResolveLookupContextAsync`, `ResolveReportAsync` |
 | Service factories | `TenantService`, `EmployeeService`, `PayrollService`, `PayrunJobService`, `ReportService`, and more |
+
+### Tool base hierarchy
+
+| Base class | Backend client | Typical tools |
+|:-----------|:---------------|:--------------|
+| `IsolationToolBase` | No | File based tools (`Regulator`), `get_server_info` |
+| `ToolBase` | Yes (`PayrollHttpClient`) | `HR`, `Payroll`, `Report`, `System` query tools |
+
+File based tool classes take only `IsolationContext`, call `ResolveWorkspacePath` for every path argument, and never need a payroll backend for file I/O.
 
 ### `ToolRegistrar`
 
