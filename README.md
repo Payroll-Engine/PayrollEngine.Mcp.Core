@@ -22,8 +22,10 @@ dotnet add package PayrollEngine.Mcp.Core
 `PayrollEngine.Mcp.Core` is the foundation for any MCP server that exposes Payroll Engine data to AI agents. It defines:
 
 - **Isolation model** — tenant, division, and employee scoping enforced at the infrastructure level
+- **Workspace isolation** — file paths confined below configured root folders
 - **Permission system** — role-based tool visibility controlled at startup
-- **`ToolBase`** — abstract base class for all MCP tool classes; provides typed service factories, identifier resolvers, isolation-aware query helpers, and uniform error handling
+- **`IsolationToolBase`** — abstract base class for all MCP tool classes, without backend client; provides isolation, permission checks, workspace path resolution, uniform error handling, and integrity signing
+- **`ToolBase`** — abstract base class for backend tool classes; adds typed service factories, identifier resolvers, and isolation-aware query helpers
 - **`ToolRegistrar`** — filters tool classes by role permission and isolation level compatibility at registration time
 
 ---
@@ -38,6 +40,45 @@ Controls **which records** are returned at runtime. Enforcement is server-side a
 | `Tenant` | All tool calls scoped to a single configured tenant |
 | `Division` | Scoped to a single division within a tenant. Requires `TenantIdentifier` and `DivisionName`. |
 | `Employee` | Self-service — single employee access. Requires `TenantIdentifier` and `EmployeeIdentifier`. |
+
+---
+
+## Workspace Isolation
+
+Controls **which files** file based tools may access. The workspace is configured in `McpServer:Regulator`; without this section no file access is possible.
+
+```json
+{
+  "McpServer": {
+    "Regulator": {
+      "Roots": [ "C:/Repos" ],
+      "RepoMask": "Repo.*",
+      "Identity": "Jane Doe",
+      "Backend": "Read",
+      "Tenants": [ "XX.Dev" ]
+    }
+  }
+}
+```
+
+| Setting | Description |
+|:--------|:------------|
+| `Roots` | Permitted root folders, fully qualified and existing (array or semicolon separated string) |
+| `RepoMask` | Wildcard mask (`*`, `?`) for the repository folders directly below a root; empty: every folder |
+| `Identity` | Human identity for records that require a person |
+| `Backend` | Backend access of the file based tools: `None` (default, offline), `Read`, `Write` |
+| `Tenants` | Allowlist of tenants for backend writes; empty: no backend writes. In `Tenant`, `Division` and `Employee` isolation only the isolated tenant is permitted |
+
+`WorkspaceContext.ResolvePath` resolves every path argument below a root and rejects:
+
+- parent segments (`..`) and segments of dots and spaces only
+- absolute paths outside the roots, including folders whose name only starts with a root name
+- links (symbolic links, junctions) whose target leaves the roots or the repository mask
+- network, device and extended paths (`\\server\share`, `\\?\`, `\\.\`), drive-relative paths (`C:folder`) and stream names (`file:stream`)
+- on Windows: rooted paths without drive (`\folder`, `/folder`), device names (`NUL`, `CON.txt`) and segments ending with a dot or space
+- repository folders not matching `RepoMask`
+
+`\` and `/` are both accepted as separators on every platform. Relative paths resolve against the first root containing the path, otherwise against the first root.
 
 ---
 
@@ -74,11 +115,27 @@ Controls **which tools** are registered at startup. Each tool class is tagged wi
 
 ### `IsolationContext`
 
-Singleton populated at startup from `appsettings.json` or environment variables. Holds the active `IsolationLevel`, tenant/division/employee identifiers, and `McpPermissions`. Injected into every tool class via the constructor.
+Singleton populated at startup from `appsettings.json` or environment variables. Holds the active `IsolationLevel`, tenant/division/employee identifiers, `McpPermissions`, and the `WorkspaceContext`. Injected into every tool class via the constructor. `Validate()` checks the isolation level and the workspace at startup.
+
+### `WorkspaceContext`
+
+Workspace isolation, read with `WorkspaceContext.FromConfiguration` from `McpServer:Regulator`. Provides `ResolvePath` (returns a `WorkspacePath` with root, full path, real path, relative path and repository), `IsRepositoryName` and `IsTenantAllowed`.
+
+### `IsolationToolBase`
+
+Abstract base class for all MCP tool classes, without backend client. Constructor injection: `IsolationContext`.
+
+| Category | Members |
+|:---------|:--------|
+| Isolation | `Isolation`, `Workspace` |
+| Permissions | `IsGranted` |
+| Workspace | `ResolveWorkspacePath` |
+| Error handling | `Error(Exception)` — serializes exceptions as structured JSON for MCP clients |
+| Integrity | `SignWithIntegrity` — HMAC-SHA256 signed envelope when `IntegrityKey` is configured |
 
 ### `ToolBase`
 
-Abstract base class for all MCP tool classes. Constructor injection: `PayrollHttpClient` + `IsolationContext`.
+Abstract base class for backend tool classes, derived from `IsolationToolBase`. Constructor injection: `PayrollHttpClient` + `IsolationContext`.
 
 Key capabilities:
 
@@ -88,7 +145,6 @@ Key capabilities:
 | Isolation guards | `FilterEmployeesByIsolation`, `AssertEmployeeInDivision` |
 | Resolvers | `ResolveTenantAsync`, `ResolveEmployeeAsync`, `ResolveDivisionAsync`, `ResolvePayrollContextAsync`, `ResolveLookupContextAsync`, `ResolveReportAsync` |
 | Service factories | `TenantService`, `EmployeeService`, `PayrollService`, `PayrunJobService`, `ReportService`, and more |
-| Error handling | `Error(Exception)` — serializes exceptions as structured JSON for MCP clients |
 
 ### `ToolRegistrar`
 

@@ -9,6 +9,7 @@ namespace PayrollEngine.Mcp.Core.Isolation;
 public sealed class McpPermissions
 {
     /// <summary>Permission for HR tools (divisions, employees, case values).</summary>
+    // ReSharper disable once InconsistentNaming
     public McpPermission HR { get; init; } = McpPermission.Read;
 
     /// <summary>Permission for Payroll tools (payrolls, payruns, jobs, temporal queries).</summary>

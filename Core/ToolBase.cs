@@ -1,8 +1,5 @@
 using System;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 using PayrollEngine.Client;
 using PayrollEngine.Client.Model;
@@ -13,17 +10,16 @@ using PayrollEngine.Mcp.Core.Isolation;
 
 namespace PayrollEngine.Mcp.Core;
 
-/// <summary>Base class for all MCP tool classes.
-/// Provides typed service factories, identifier-to-id resolvers, and uniform error handling.
+/// <summary>Base class for all MCP tool classes with backend access.
+/// Provides typed service factories, identifier-to-id resolvers, and isolation-aware queries;
+/// isolation, permissions, error handling and integrity signing are inherited from <see cref="IsolationToolBase"/>.
 /// AI agents work exclusively with external string keys (Identifier/Name);
 /// internal integer IDs are resolved here before calling id-based service methods.</summary>
 public abstract class ToolBase(PayrollHttpClient httpClient, IsolationContext isolation)
+    : IsolationToolBase(isolation)
 {
     /// <summary>The Payroll HTTP client used for backend communication</summary>
     private PayrollHttpClient HttpClient { get; } = httpClient;
-
-    /// <summary>The active data isolation context. Every tool call is filtered through this context.</summary>
-    protected IsolationContext Isolation { get; } = isolation;
 
     #region Query helpers
 
@@ -189,60 +185,6 @@ public abstract class ToolBase(PayrollHttpClient httpClient, IsolationContext is
             return ActiveQuery(filter);
         }
         return ActiveQuery();
-    }
-
-    #endregion
-
-    #region Error handling
-
-    /// <summary>Serializes a caught exception as a structured JSON error result.
-    /// All public tool methods must catch exceptions and delegate to this method
-    /// so the MCP client always receives valid JSON, never a raw exception message.</summary>
-    /// <param name="exception">The caught exception</param>
-    /// <returns>JSON: { "error": "...", "type": "..." }</returns>
-    protected static string Error(Exception exception)
-    {
-        var message = exception.GetBaseException().Message;
-        var type = exception.GetBaseException().GetType().Name;
-        return JsonSerializer.Serialize(new { error = message, type });
-    }
-
-    #endregion
-
-    #region Integrity signing
-
-    /// <summary>Wraps a JSON result in an HMAC-SHA256 signed envelope when IntegrityKey is configured.
-    /// Returns the original JSON unchanged when no key is set (backward compatible).
-    /// The recipient verifies the signature by recomputing HMAC-SHA256 over the data JSON
-    /// with the same shared secret.</summary>
-    /// <param name="dataJson">Serialized JSON payload to sign</param>
-    /// <returns>Original JSON (no key) or signed envelope JSON</returns>
-    protected string SignWithIntegrity(string dataJson)
-    {
-        if (string.IsNullOrWhiteSpace(Isolation.IntegrityKey))
-        {
-            return dataJson;
-        }
-
-        var keyBytes = Encoding.UTF8.GetBytes(Isolation.IntegrityKey);
-        var dataBytes = Encoding.UTF8.GetBytes(dataJson);
-        var hash = HMACSHA256.HashData(keyBytes, dataBytes);
-        var signature = Convert.ToBase64String(hash)
-            .TrimEnd('=')
-            .Replace('+', '-')
-            .Replace('/', '_');
-
-        var envelope = new
-        {
-            data = JsonSerializer.Deserialize<JsonElement>(dataJson),
-            integrity = new
-            {
-                algorithm = "HMAC-SHA256",
-                signature,
-                timestamp = DateTime.UtcNow.ToString("o")
-            }
-        };
-        return JsonSerializer.Serialize(envelope);
     }
 
     #endregion

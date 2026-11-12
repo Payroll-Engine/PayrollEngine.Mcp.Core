@@ -6,6 +6,7 @@ public enum McpRole
 {
     /// <summary>Employee master data and organisational structure:
     /// divisions, employees, case values.</summary>
+    // ReSharper disable once InconsistentNaming
     HR,
 
     /// <summary>Payroll execution and result verification:

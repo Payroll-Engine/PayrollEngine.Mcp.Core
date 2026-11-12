@@ -4,6 +4,52 @@
         <name>PayrollEngine.Mcp.Core</name>
     </assembly>
     <members>
+        <member name="T:PayrollEngine.Mcp.Core.IsolationToolBase">
+            <summary>Base class for all MCP tool classes, independent of the backend.
+            Provides the isolation context, permission checks, workspace path resolution,
+            uniform error handling and integrity signing.
+            Tool classes without backend access (e.g. file based tools) derive directly from this class;
+            backend tool classes derive from <see cref="T:PayrollEngine.Mcp.Core.ToolBase"/>.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.IsolationToolBase.#ctor(PayrollEngine.Mcp.Core.Isolation.IsolationContext)">
+            <summary>Base class for all MCP tool classes, independent of the backend.
+            Provides the isolation context, permission checks, workspace path resolution,
+            uniform error handling and integrity signing.
+            Tool classes without backend access (e.g. file based tools) derive directly from this class;
+            backend tool classes derive from <see cref="T:PayrollEngine.Mcp.Core.ToolBase"/>.</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.IsolationToolBase.Isolation">
+            <summary>The active data isolation context. Every tool call is filtered through this context.</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.IsolationToolBase.Workspace">
+            <summary>The workspace context with the permitted root folders for file based tools.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.IsolationToolBase.IsGranted(PayrollEngine.Mcp.Core.Isolation.McpRole,PayrollEngine.Mcp.Core.Isolation.McpPermission)">
+            <summary>Returns true if the deployment grants at least the required permission for the role.</summary>
+            <param name="role">The tool role</param>
+            <param name="required">The minimum required permission</param>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.IsolationToolBase.ResolveWorkspacePath(System.String)">
+            <summary>Resolves a path argument below the configured workspace roots.
+            Throws <see cref="T:System.UnauthorizedAccessException"/> when the path leaves the workspace.</summary>
+            <param name="path">Relative or absolute path provided by the AI agent</param>
+            <returns>The resolved workspace path</returns>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.IsolationToolBase.Error(System.Exception)">
+            <summary>Serializes a caught exception as a structured JSON error result.
+            All public tool methods must catch exceptions and delegate to this method
+            so the MCP client always receives valid JSON, never a raw exception message.</summary>
+            <param name="exception">The caught exception</param>
+            <returns>JSON: { "error": "...", "type": "..." }</returns>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.IsolationToolBase.SignWithIntegrity(System.String)">
+            <summary>Wraps a JSON result in an HMAC-SHA256 signed envelope when IntegrityKey is configured.
+            Returns the original JSON unchanged when no key is set (backward compatible).
+            The recipient verifies the signature by recomputing HMAC-SHA256 over the data JSON
+            with the same shared secret.</summary>
+            <param name="dataJson">Serialized JSON payload to sign</param>
+            <returns>Original JSON (no key) or signed envelope JSON</returns>
+        </member>
         <member name="T:PayrollEngine.Mcp.Core.Isolation.IsolationContext">
             <summary>Holds the active data isolation and permission configuration for the MCP server session.
             Registered as a singleton; populated from McpServer appsettings on startup.</summary>
@@ -38,6 +84,10 @@
         <member name="P:PayrollEngine.Mcp.Core.Isolation.IsolationContext.Permissions">
             <summary>Role permission levels for this deployment.
             Defaults to Full for all roles when absent from configuration.</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.IsolationContext.Workspace">
+            <summary>File workspace of the file based tools.
+            Defaults to an empty workspace (no roots, no backend access) when absent from configuration.</summary>
         </member>
         <member name="M:PayrollEngine.Mcp.Core.Isolation.IsolationContext.Validate">
             <summary>Validates the isolation context at startup.
@@ -148,23 +198,143 @@
             Use this for tools that are only meaningful at a specific isolation level
             (e.g. consolidation tools require MultiTenant).</param>
         </member>
+        <member name="T:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext">
+            <summary>File workspace of the file based tools: permitted root folders, repository mask,
+            human identity and backend access.
+            Populated from McpServer:Regulator in appsettings.json or environment variables.
+            Every path argument of a file based tool is resolved below a root with <see cref="M:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.ResolvePath(System.String)"/>.
+            Default when the section is absent: no roots, no backend access.</summary>
+        </member>
+        <member name="F:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.SectionName">
+            <summary>The configuration section of the workspace</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.Roots">
+            <summary>Permitted root folders (fully qualified). Empty: no file access.</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.RepoMask">
+            <summary>Wildcard mask (<c>*</c>, <c>?</c>) for the repository folders directly below a root.
+            Null or empty: every folder below a root.</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.Identity">
+            <summary>Human identity used for records that require a person</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.Backend">
+            <summary>Backend access of the file based tools: None (offline), Read or Write. Default: None.</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.Tenants">
+            <summary>Allowlist of tenants for backend writes. Empty: no backend writes.</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.IsConfigured">
+            <summary>True when at least one root is configured</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.#ctor">
+            <summary>Creates an empty workspace; the roots are resolved on first use</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.FromConfiguration(Microsoft.Extensions.Configuration.IConfiguration)">
+            <summary>Reads McpServer:Regulator from configuration.
+            Roots and Tenants accept an array or a semicolon separated string.
+            Returns an empty workspace when the section is absent.</summary>
+            <param name="configuration">The application configuration</param>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.Validate">
+            <summary>Validates the workspace at startup.
+            Throws if a root is not a fully qualified existing folder, the repository mask is invalid,
+            or workspace settings are present without roots.</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.IsRepositoryName(System.String)">
+            <summary>Returns true when the folder name matches the repository mask.</summary>
+            <param name="name">Folder name directly below a root</param>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.IsTenantAllowed(System.String)">
+            <summary>Returns true when backend writes are granted for the tenant
+            (Backend is Write and the tenant is on the allowlist).</summary>
+            <param name="tenantIdentifier">The tenant identifier</param>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.ResolvePath(System.String)">
+            <summary>Resolves a path argument below the workspace roots.
+            Accepts relative paths (resolved against the first root containing the path,
+            otherwise the first root) and absolute paths below a root; <c>\</c> and <c>/</c> are both separators.
+            Rejects parent segments (<c>..</c>), absolute paths outside the roots, links leading outside the roots,
+            device, UNC, drive-relative and stream paths, and repository folders not matching the mask.</summary>
+            <param name="path">Relative or absolute path provided by the caller</param>
+            <returns>The resolved workspace path</returns>
+            <exception cref="T:System.ArgumentException">The path is empty</exception>
+            <exception cref="T:System.InvalidOperationException">No workspace roots are configured</exception>
+            <exception cref="T:System.UnauthorizedAccessException">The path leaves the workspace</exception>
+        </member>
+        <member name="T:PayrollEngine.Mcp.Core.Isolation.WorkspaceLinkResolver">
+            <summary>Resolves symbolic links and junctions in every segment of a full path.
+            Segments that do not exist are appended unchanged.</summary>
+        </member>
+        <member name="F:PayrollEngine.Mcp.Core.Isolation.WorkspaceLinkResolver.MaxLinkHops">
+            <summary>Maximum number of links followed for one path (guards against link cycles)</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.Isolation.WorkspaceLinkResolver.GetRealPath(System.String)">
+            <summary>Returns the full path with all links resolved.</summary>
+            <param name="fullPath">Normalized full path</param>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.Isolation.WorkspaceLinkResolver.GetLinkTarget(System.String)">
+            <summary>Returns the full path of the immediate link target, or null when the path is no link.
+            Dangling links return their target as well.</summary>
+        </member>
+        <member name="T:PayrollEngine.Mcp.Core.Isolation.WorkspacePath">
+            <summary>A path argument resolved below a workspace root.
+            Created by <see cref="M:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.ResolvePath(System.String)"/> only.</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspacePath.Root">
+            <summary>The workspace root containing the path (full path, no trailing separator)</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspacePath.FullPath">
+            <summary>The full path below the root, with platform separators</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspacePath.RealPath">
+            <summary>The full path with all links resolved; equals <see cref="P:PayrollEngine.Mcp.Core.Isolation.WorkspacePath.FullPath"/> without links.
+            Lies below a workspace root as well.</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspacePath.RelativePath">
+            <summary>The path relative to the root; empty for the root itself</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspacePath.Repository">
+            <summary>The repository folder name (first segment below the root); null for the root itself</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspacePath.IsRoot">
+            <summary>True when the path is the workspace root itself</summary>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.Isolation.WorkspacePath.ToString">
+            <inheritdoc />
+        </member>
+        <member name="T:PayrollEngine.Mcp.Core.Isolation.WorkspaceRoot">
+            <summary>A configured workspace root with its full path and its real path (links resolved)</summary>
+            <param name="FullPath">Full path without trailing separator</param>
+            <param name="RealPath">Full path with all links resolved</param>
+        </member>
+        <member name="M:PayrollEngine.Mcp.Core.Isolation.WorkspaceRoot.#ctor(System.String,System.String)">
+            <summary>A configured workspace root with its full path and its real path (links resolved)</summary>
+            <param name="FullPath">Full path without trailing separator</param>
+            <param name="RealPath">Full path with all links resolved</param>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspaceRoot.FullPath">
+            <summary>Full path without trailing separator</summary>
+        </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspaceRoot.RealPath">
+            <summary>Full path with all links resolved</summary>
+        </member>
         <member name="T:PayrollEngine.Mcp.Core.ToolBase">
-            <summary>Base class for all MCP tool classes.
-            Provides typed service factories, identifier-to-id resolvers, and uniform error handling.
+            <summary>Base class for all MCP tool classes with backend access.
+            Provides typed service factories, identifier-to-id resolvers, and isolation-aware queries;
+            isolation, permissions, error handling and integrity signing are inherited from <see cref="T:PayrollEngine.Mcp.Core.IsolationToolBase"/>.
             AI agents work exclusively with external string keys (Identifier/Name);
             internal integer IDs are resolved here before calling id-based service methods.</summary>
         </member>
         <member name="M:PayrollEngine.Mcp.Core.ToolBase.#ctor(PayrollEngine.Client.PayrollHttpClient,PayrollEngine.Mcp.Core.Isolation.IsolationContext)">
-            <summary>Base class for all MCP tool classes.
-            Provides typed service factories, identifier-to-id resolvers, and uniform error handling.
+            <summary>Base class for all MCP tool classes with backend access.
+            Provides typed service factories, identifier-to-id resolvers, and isolation-aware queries;
+            isolation, permissions, error handling and integrity signing are inherited from <see cref="T:PayrollEngine.Mcp.Core.IsolationToolBase"/>.
             AI agents work exclusively with external string keys (Identifier/Name);
             internal integer IDs are resolved here before calling id-based service methods.</summary>
         </member>
         <member name="P:PayrollEngine.Mcp.Core.ToolBase.HttpClient">
             <summary>The Payroll HTTP client used for backend communication</summary>
-        </member>
-        <member name="P:PayrollEngine.Mcp.Core.ToolBase.Isolation">
-            <summary>The active data isolation context. Every tool call is filtered through this context.</summary>
         </member>
         <member name="M:PayrollEngine.Mcp.Core.ToolBase.ActiveQuery(System.String,System.Nullable{System.Int32},System.String)">
             <summary>Builds a Query with status=Active filter, optionally combined with an additional OData filter.
@@ -212,21 +382,6 @@
             <summary>Builds an active query for payruns filtered by the isolated division.
             In Division isolation mode, returns only payruns whose payroll belongs to the configured division.
             Multiple payroll IDs are expressed as a single OData in() expression to keep the filter compact.</summary>
-        </member>
-        <member name="M:PayrollEngine.Mcp.Core.ToolBase.Error(System.Exception)">
-            <summary>Serializes a caught exception as a structured JSON error result.
-            All public tool methods must catch exceptions and delegate to this method
-            so the MCP client always receives valid JSON, never a raw exception message.</summary>
-            <param name="exception">The caught exception</param>
-            <returns>JSON: { "error": "...", "type": "..." }</returns>
-        </member>
-        <member name="M:PayrollEngine.Mcp.Core.ToolBase.SignWithIntegrity(System.String)">
-            <summary>Wraps a JSON result in an HMAC-SHA256 signed envelope when IntegrityKey is configured.
-            Returns the original JSON unchanged when no key is set (backward compatible).
-            The recipient verifies the signature by recomputing HMAC-SHA256 over the data JSON
-            with the same shared secret.</summary>
-            <param name="dataJson">Serialized JSON payload to sign</param>
-            <returns>Original JSON (no key) or signed envelope JSON</returns>
         </member>
         <member name="M:PayrollEngine.Mcp.Core.ToolBase.AdminService">
             <summary>Creates a new admin service</summary>

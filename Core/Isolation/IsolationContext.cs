@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 
 namespace PayrollEngine.Mcp.Core.Isolation;
 
@@ -37,9 +38,33 @@ public sealed class IsolationContext
     /// Defaults to Full for all roles when absent from configuration.</summary>
     public McpPermissions Permissions { get; init; } = new();
 
+    /// <summary>File workspace of the file based tools.
+    /// Defaults to an empty workspace (no roots, no backend access) when absent from configuration.</summary>
+    public WorkspaceContext Workspace { get; init; } = new();
+
     /// <summary>Validates the isolation context at startup.
     /// Throws if configuration is incomplete or uses an invalid combination.</summary>
     public void Validate()
+    {
+        ValidateLevel();
+
+        var workspace = Workspace ?? throw new InvalidOperationException("Workspace context is missing.");
+        workspace.Validate();
+
+        // workspace backend writes must stay inside the isolated tenant
+        if (Level != IsolationLevel.MultiTenant)
+        {
+            var foreignTenant = workspace.Tenants.FirstOrDefault(tenant =>
+                !string.Equals(tenant, TenantIdentifier, StringComparison.OrdinalIgnoreCase));
+            if (foreignTenant != null)
+            {
+                throw new InvalidOperationException(
+                    $"{WorkspaceContext.SectionName}:Tenants entry '{foreignTenant}' is outside the isolated tenant '{TenantIdentifier}'.");
+            }
+        }
+    }
+
+    private void ValidateLevel()
     {
         if (Level == IsolationLevel.Tenant && string.IsNullOrWhiteSpace(TenantIdentifier))
         {
