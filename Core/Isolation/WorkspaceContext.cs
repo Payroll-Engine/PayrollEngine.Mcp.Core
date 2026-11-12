@@ -27,6 +27,10 @@ public sealed class WorkspaceContext
     /// <summary>Human identity used for records that require a person</summary>
     public string Identity { get; init; }
 
+    /// <summary>Identities of automated agents (names that appear in records which require a person).
+    /// A tool can refuse a record whose person is one of these identities. Empty: no agent identity configured.</summary>
+    public IReadOnlyList<string> AgentIdentities { get; init; } = [];
+
     /// <summary>Backend access of the file based tools: None (offline), Read or Write. Default: None.</summary>
     public McpPermission Backend { get; init; } = McpPermission.None;
 
@@ -78,6 +82,7 @@ public sealed class WorkspaceContext
             Roots = ReadList(section.GetSection(nameof(Roots))),
             RepoMask = TrimToNull(section[nameof(RepoMask)]),
             Identity = TrimToNull(section[nameof(Identity)]),
+            AgentIdentities = ReadList(section.GetSection(nameof(AgentIdentities))),
             Backend = ParseBackend(section[nameof(Backend)]),
             Tenants = ReadList(section.GetSection(nameof(Tenants)))
         };
@@ -121,7 +126,8 @@ public sealed class WorkspaceContext
     {
         if (!IsConfigured)
         {
-            if (RepoMask != null || Identity != null || Backend != McpPermission.None || Tenants.Count > 0)
+            if (RepoMask != null || Identity != null || AgentIdentities.Count > 0 ||
+                Backend != McpPermission.None || Tenants.Count > 0)
             {
                 throw new InvalidOperationException(
                     $"{SectionName}:Roots is required when other {SectionName} settings are present.");
@@ -133,6 +139,10 @@ public sealed class WorkspaceContext
         if (Tenants.Any(string.IsNullOrWhiteSpace))
         {
             throw new InvalidOperationException($"{SectionName}:Tenants contains an empty entry.");
+        }
+        if (AgentIdentities.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new InvalidOperationException($"{SectionName}:AgentIdentities contains an empty entry.");
         }
         GetResolvedRoots();
     }

@@ -54,6 +54,7 @@ Controls **which files** file based tools may access. The workspace is configure
       "Roots": [ "C:/Repos" ],
       "RepoMask": "Repo.*",
       "Identity": "Jane Doe",
+      "AgentIdentities": [ "Example Agent" ],
       "Backend": "Read",
       "Tenants": [ "XX.Dev" ]
     }
@@ -66,6 +67,7 @@ Controls **which files** file based tools may access. The workspace is configure
 | `Roots` | Permitted root folders, fully qualified and existing (array or semicolon separated string) |
 | `RepoMask` | Wildcard mask (`*`, `?`) for the repository folders directly below a root; empty: every folder |
 | `Identity` | Human identity for records that require a person |
+| `AgentIdentities` | Names of automated agents (array or semicolon separated string). A tool can refuse a record whose person is one of these names; empty: none configured |
 | `Backend` | Backend access of the file based tools: `None` (default, offline), `Read`, `Write` |
 | `Tenants` | Allowlist of tenants for backend writes; empty: no backend writes. In `Tenant`, `Division` and `Employee` isolation only the isolated tenant is permitted |
 

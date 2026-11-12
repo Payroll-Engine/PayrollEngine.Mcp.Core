@@ -225,6 +225,10 @@
         <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.Identity">
             <summary>Human identity used for records that require a person</summary>
         </member>
+        <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.AgentIdentities">
+            <summary>Identities of automated agents (names that appear in records which require a person).
+            A tool can refuse a record whose person is one of these identities. Empty: no agent identity configured.</summary>
+        </member>
         <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.Backend">
             <summary>Backend access of the file based tools: None (offline), Read or Write. Default: None.</summary>
         </member>
