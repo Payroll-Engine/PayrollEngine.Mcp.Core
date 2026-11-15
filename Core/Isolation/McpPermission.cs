@@ -12,6 +12,6 @@ public enum McpPermission
 
     /// <summary>Read and write tools. Includes all Read tools plus mutation operations
     /// (case changes, payrun execution, employee mutations).
-    /// Available in PayrollEngine.Mcp.Server.Pro only.</summary>
+    /// Write tools are provided by hosts that register them; the OSS tool package contains read tools only.</summary>
     Write
 }
