@@ -35,7 +35,7 @@ public sealed class IsolationContext
     public string IntegrityKey { get; init; }
 
     /// <summary>Role permission levels for this deployment.
-    /// Defaults to Full for all roles when absent from configuration.</summary>
+    /// Defaults to Read for the backend roles and None for Regulator when absent from configuration.</summary>
     public McpPermissions Permissions { get; init; } = new();
 
     /// <summary>File workspace of the file based tools.

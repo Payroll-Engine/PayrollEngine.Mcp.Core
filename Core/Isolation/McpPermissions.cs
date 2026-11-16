@@ -5,7 +5,7 @@ namespace PayrollEngine.Mcp.Core.Isolation;
 
 /// <summary>Permission levels per role for this MCP Server deployment.
 /// Populated from McpServer:Permissions in appsettings.json or environment variables.
-/// Default when the Permissions section is absent: Read for all roles.</summary>
+/// Default when the Permissions section is absent: Read for the backend roles and None for Regulator.</summary>
 public sealed class McpPermissions
 {
     /// <summary>Permission for HR tools (divisions, employees, case values).</summary>
@@ -41,7 +41,8 @@ public sealed class McpPermissions
         GetPermission(role) >= required;
 
     /// <summary>Reads McpServer:Permissions from configuration.
-    /// Returns a fully-read instance when the section is absent.</summary>
+    /// Returns the default instance when the section is absent. A missing or empty key in an existing section is None.</summary>
+    /// <exception cref="InvalidOperationException">A key holds a value that is not a permission name (None, Read, Write)</exception>
     public static McpPermissions FromConfiguration(IConfiguration configuration)
     {
         var section = configuration.GetSection("McpServer:Permissions");
@@ -50,16 +51,33 @@ public sealed class McpPermissions
 
         return new McpPermissions
         {
-            HR      = ParsePermission(section["HR"]),
-            Payroll = ParsePermission(section["Payroll"]),
-            Report  = ParsePermission(section["Report"]),
-            System  = ParsePermission(section["System"]),
-            Regulator = ParsePermission(section["Regulator"])
+            HR      = ParsePermission(section, "HR"),
+            Payroll = ParsePermission(section, "Payroll"),
+            Report  = ParsePermission(section, "Report"),
+            System  = ParsePermission(section, "System"),
+            Regulator = ParsePermission(section, "Regulator")
         };
     }
 
-    private static McpPermission ParsePermission(string value) =>
-        Enum.TryParse<McpPermission>(value, ignoreCase: true, out var result)
-            ? result
-            : McpPermission.None;
+    private static McpPermission ParsePermission(IConfigurationSection section, string key)
+    {
+        var value = section[key];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return McpPermission.None;
+        }
+
+        // compare against the names: Enum.TryParse also accepts numbers and comma lists
+        foreach (var name in Enum.GetNames<McpPermission>())
+        {
+            if (string.Equals(name, value.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                return Enum.Parse<McpPermission>(name);
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"{section.Path}:{key} has the invalid value '{value}'. " +
+            $"Allowed values: {string.Join(", ", Enum.GetNames<McpPermission>())}.");
+    }
 }

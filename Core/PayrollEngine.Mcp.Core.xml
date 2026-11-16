@@ -83,7 +83,7 @@
         </member>
         <member name="P:PayrollEngine.Mcp.Core.Isolation.IsolationContext.Permissions">
             <summary>Role permission levels for this deployment.
-            Defaults to Full for all roles when absent from configuration.</summary>
+            Defaults to Read for the backend roles and None for Regulator when absent from configuration.</summary>
         </member>
         <member name="P:PayrollEngine.Mcp.Core.Isolation.IsolationContext.Workspace">
             <summary>File workspace of the file based tools.
@@ -129,7 +129,7 @@
         <member name="T:PayrollEngine.Mcp.Core.Isolation.McpPermissions">
             <summary>Permission levels per role for this MCP Server deployment.
             Populated from McpServer:Permissions in appsettings.json or environment variables.
-            Default when the Permissions section is absent: Read for all roles.</summary>
+            Default when the Permissions section is absent: Read for the backend roles and None for Regulator.</summary>
         </member>
         <member name="P:PayrollEngine.Mcp.Core.Isolation.McpPermissions.HR">
             <summary>Permission for HR tools (divisions, employees, case values).</summary>
@@ -155,7 +155,8 @@
         </member>
         <member name="M:PayrollEngine.Mcp.Core.Isolation.McpPermissions.FromConfiguration(Microsoft.Extensions.Configuration.IConfiguration)">
             <summary>Reads McpServer:Permissions from configuration.
-            Returns a fully-read instance when the section is absent.</summary>
+            Returns the default instance when the section is absent. A missing or empty key in an existing section is None.</summary>
+            <exception cref="T:System.InvalidOperationException">A key holds a value that is not a permission name (None, Read, Write)</exception>
         </member>
         <member name="T:PayrollEngine.Mcp.Core.Isolation.McpRole">
             <summary>Functional domain to which a tool class belongs.
