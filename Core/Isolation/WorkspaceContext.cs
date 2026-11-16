@@ -106,13 +106,18 @@ public sealed class WorkspaceContext
         {
             return McpPermission.None;
         }
-        if (!Enum.TryParse<McpPermission>(value.Trim(), ignoreCase: true, out var backend) ||
-            !Enum.IsDefined(backend))
+
+        // compare against the names: Enum.TryParse also accepts numbers and comma lists
+        foreach (var name in Enum.GetNames<McpPermission>())
         {
-            throw new InvalidOperationException(
-                $"{SectionName}:Backend has the invalid value '{value}' (allowed: None, Read, Write).");
+            if (string.Equals(name, value.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                return Enum.Parse<McpPermission>(name);
+            }
         }
-        return backend;
+
+        throw new InvalidOperationException(
+            $"{SectionName}:Backend has the invalid value '{value}' (allowed: None, Read, Write).");
     }
 
     #endregion
