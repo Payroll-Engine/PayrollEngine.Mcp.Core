@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 
 namespace PayrollEngine.Mcp.Core.Isolation;
 
@@ -50,18 +49,6 @@ public sealed class IsolationContext
 
         var workspace = Workspace ?? throw new InvalidOperationException("Workspace context is missing.");
         workspace.Validate();
-
-        // workspace backend writes must stay inside the isolated tenant
-        if (Level != IsolationLevel.MultiTenant)
-        {
-            var foreignTenant = workspace.Tenants.FirstOrDefault(tenant =>
-                !string.Equals(tenant, TenantIdentifier, StringComparison.OrdinalIgnoreCase));
-            if (foreignTenant != null)
-            {
-                throw new InvalidOperationException(
-                    $"{WorkspaceContext.SectionName}:Tenants entry '{foreignTenant}' is outside the isolated tenant '{TenantIdentifier}'.");
-            }
-        }
     }
 
     private void ValidateLevel()

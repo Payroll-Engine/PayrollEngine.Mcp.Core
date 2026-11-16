@@ -208,7 +208,7 @@
         </member>
         <member name="T:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext">
             <summary>File workspace of the file based tools: permitted root folders, repository mask,
-            human identity and backend access.
+            agent identities and backend access.
             Populated from McpServer:Regulator in appsettings.json or environment variables.
             Every path argument of a file based tool is resolved below a root with <see cref="M:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.ResolvePath(System.String)"/>.
             Default when the section is absent: no roots, no backend access.</summary>
@@ -223,18 +223,13 @@
             <summary>Wildcard mask (<c>*</c>, <c>?</c>) for the repository folders directly below a root.
             Null or empty: every folder below a root.</summary>
         </member>
-        <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.Identity">
-            <summary>Human identity used for records that require a person</summary>
-        </member>
         <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.AgentIdentities">
             <summary>Identities of automated agents (names that appear in records which require a person).
             A tool can refuse a record whose person is one of these identities. Empty: no agent identity configured.</summary>
         </member>
         <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.Backend">
-            <summary>Backend access of the file based tools: None (offline), Read or Write. Default: None.</summary>
-        </member>
-        <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.Tenants">
-            <summary>Allowlist of tenants for backend writes. Empty: no backend writes.</summary>
+            <summary>Backend access of the file based tools: None (offline) or Read. Default: None.
+            Write is not supported and is rejected by <see cref="M:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.Validate"/> and <see cref="M:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.FromConfiguration(Microsoft.Extensions.Configuration.IConfiguration)"/>.</summary>
         </member>
         <member name="P:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.IsConfigured">
             <summary>True when at least one root is configured</summary>
@@ -244,23 +239,18 @@
         </member>
         <member name="M:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.FromConfiguration(Microsoft.Extensions.Configuration.IConfiguration)">
             <summary>Reads McpServer:Regulator from configuration.
-            Roots and Tenants accept an array or a semicolon separated string.
+            Roots and AgentIdentities accept an array or a semicolon separated string.
             Returns an empty workspace when the section is absent.</summary>
             <param name="configuration">The application configuration</param>
         </member>
         <member name="M:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.Validate">
             <summary>Validates the workspace at startup.
             Throws if a root is not a fully qualified existing folder, the repository mask is invalid,
-            or workspace settings are present without roots.</summary>
+            the backend access is not None or Read, or workspace settings are present without roots.</summary>
         </member>
         <member name="M:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.IsRepositoryName(System.String)">
             <summary>Returns true when the folder name matches the repository mask.</summary>
             <param name="name">Folder name directly below a root</param>
-        </member>
-        <member name="M:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.IsTenantAllowed(System.String)">
-            <summary>Returns true when backend writes are granted for the tenant
-            (Backend is Write and the tenant is on the allowlist).</summary>
-            <param name="tenantIdentifier">The tenant identifier</param>
         </member>
         <member name="M:PayrollEngine.Mcp.Core.Isolation.WorkspaceContext.ResolvePath(System.String)">
             <summary>Resolves a path argument below the workspace roots.

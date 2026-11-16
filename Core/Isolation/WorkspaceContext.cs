@@ -8,7 +8,7 @@ using Microsoft.Extensions.Configuration;
 namespace PayrollEngine.Mcp.Core.Isolation;
 
 /// <summary>File workspace of the file based tools: permitted root folders, repository mask,
-/// human identity and backend access.
+/// agent identities and backend access.
 /// Populated from McpServer:Regulator in appsettings.json or environment variables.
 /// Every path argument of a file based tool is resolved below a root with <see cref="ResolvePath"/>.
 /// Default when the section is absent: no roots, no backend access.</summary>
@@ -24,18 +24,13 @@ public sealed class WorkspaceContext
     /// Null or empty: every folder below a root.</summary>
     public string RepoMask { get; init; }
 
-    /// <summary>Human identity used for records that require a person</summary>
-    public string Identity { get; init; }
-
     /// <summary>Identities of automated agents (names that appear in records which require a person).
     /// A tool can refuse a record whose person is one of these identities. Empty: no agent identity configured.</summary>
     public IReadOnlyList<string> AgentIdentities { get; init; } = [];
 
-    /// <summary>Backend access of the file based tools: None (offline), Read or Write. Default: None.</summary>
+    /// <summary>Backend access of the file based tools: None (offline) or Read. Default: None.
+    /// Write is not supported and is rejected by <see cref="Validate"/> and <see cref="FromConfiguration"/>.</summary>
     public McpPermission Backend { get; init; } = McpPermission.None;
-
-    /// <summary>Allowlist of tenants for backend writes. Empty: no backend writes.</summary>
-    public IReadOnlyList<string> Tenants { get; init; } = [];
 
     /// <summary>True when at least one root is configured</summary>
     public bool IsConfigured => Roots.Count > 0;
@@ -65,7 +60,7 @@ public sealed class WorkspaceContext
     #region Configuration
 
     /// <summary>Reads McpServer:Regulator from configuration.
-    /// Roots and Tenants accept an array or a semicolon separated string.
+    /// Roots and AgentIdentities accept an array or a semicolon separated string.
     /// Returns an empty workspace when the section is absent.</summary>
     /// <param name="configuration">The application configuration</param>
     public static WorkspaceContext FromConfiguration(IConfiguration configuration)
@@ -81,10 +76,8 @@ public sealed class WorkspaceContext
         {
             Roots = ReadList(section.GetSection(nameof(Roots))),
             RepoMask = TrimToNull(section[nameof(RepoMask)]),
-            Identity = TrimToNull(section[nameof(Identity)]),
             AgentIdentities = ReadList(section.GetSection(nameof(AgentIdentities))),
-            Backend = ParseBackend(section[nameof(Backend)]),
-            Tenants = ReadList(section.GetSection(nameof(Tenants)))
+            Backend = ParseBackend(section[nameof(Backend)])
         };
     }
 
@@ -108,7 +101,7 @@ public sealed class WorkspaceContext
         }
 
         // compare against the names: Enum.TryParse also accepts numbers and comma lists
-        foreach (var name in Enum.GetNames<McpPermission>())
+        foreach (var name in BackendValues)
         {
             if (string.Equals(name, value.Trim(), StringComparison.OrdinalIgnoreCase))
             {
@@ -117,8 +110,11 @@ public sealed class WorkspaceContext
         }
 
         throw new InvalidOperationException(
-            $"{SectionName}:Backend has the invalid value '{value}' (allowed: None, Read, Write).");
+            $"{SectionName}:Backend has the invalid value '{value}' (allowed: {string.Join(", ", BackendValues)}).");
     }
+
+    // Write has no meaning for the workspace: backend writes are not supported
+    private static readonly string[] BackendValues = [nameof(McpPermission.None), nameof(McpPermission.Read)];
 
     #endregion
 
@@ -126,13 +122,17 @@ public sealed class WorkspaceContext
 
     /// <summary>Validates the workspace at startup.
     /// Throws if a root is not a fully qualified existing folder, the repository mask is invalid,
-    /// or workspace settings are present without roots.</summary>
+    /// the backend access is not None or Read, or workspace settings are present without roots.</summary>
     public void Validate()
     {
+        if (Backend is not (McpPermission.None or McpPermission.Read))
+        {
+            throw new InvalidOperationException(
+                $"{SectionName}:Backend has the invalid value '{Backend}' (allowed: {string.Join(", ", BackendValues)}).");
+        }
         if (!IsConfigured)
         {
-            if (RepoMask != null || Identity != null || AgentIdentities.Count > 0 ||
-                Backend != McpPermission.None || Tenants.Count > 0)
+            if (RepoMask != null || AgentIdentities.Count > 0 || Backend != McpPermission.None)
             {
                 throw new InvalidOperationException(
                     $"{SectionName}:Roots is required when other {SectionName} settings are present.");
@@ -141,10 +141,6 @@ public sealed class WorkspaceContext
         }
 
         ValidateRepoMask(RepoMask);
-        if (Tenants.Any(string.IsNullOrWhiteSpace))
-        {
-            throw new InvalidOperationException($"{SectionName}:Tenants contains an empty entry.");
-        }
         if (AgentIdentities.Any(string.IsNullOrWhiteSpace))
         {
             throw new InvalidOperationException($"{SectionName}:AgentIdentities contains an empty entry.");
@@ -196,7 +192,7 @@ public sealed class WorkspaceContext
 
     #endregion
 
-    #region Repository and tenant checks
+    #region Repository checks
 
     /// <summary>Returns true when the folder name matches the repository mask.</summary>
     /// <param name="name">Folder name directly below a root</param>
@@ -209,15 +205,6 @@ public sealed class WorkspaceContext
         return string.IsNullOrEmpty(RepoMask) ||
                FileSystemName.MatchesSimpleExpression(RepoMask, name, ignoreCase: OperatingSystem.IsWindows());
     }
-
-    /// <summary>Returns true when backend writes are granted for the tenant
-    /// (Backend is Write and the tenant is on the allowlist).</summary>
-    /// <param name="tenantIdentifier">The tenant identifier</param>
-    public bool IsTenantAllowed(string tenantIdentifier) =>
-        Backend >= McpPermission.Write &&
-        !string.IsNullOrWhiteSpace(tenantIdentifier) &&
-        Tenants.Any(tenant => string.Equals(tenant, tenantIdentifier.Trim(), StringComparison.OrdinalIgnoreCase));
-
     #endregion
 
     #region Path resolution

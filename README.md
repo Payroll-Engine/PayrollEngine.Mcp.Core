@@ -53,10 +53,8 @@ Controls **which files** file based tools may access. The workspace is configure
     "Regulator": {
       "Roots": [ "C:/Repos" ],
       "RepoMask": "Repo.*",
-      "Identity": "Jane Doe",
       "AgentIdentities": [ "Example Agent" ],
-      "Backend": "Read",
-      "Tenants": [ "XX.Dev" ]
+      "Backend": "Read"
     }
   }
 }
@@ -66,10 +64,8 @@ Controls **which files** file based tools may access. The workspace is configure
 |:--------|:------------|
 | `Roots` | Permitted root folders, fully qualified and existing (array or semicolon separated string) |
 | `RepoMask` | Wildcard mask (`*`, `?`) for the repository folders directly below a root; empty: every folder |
-| `Identity` | Human identity for records that require a person |
 | `AgentIdentities` | Names of automated agents (array or semicolon separated string). A tool can refuse a record whose person is one of these names; empty: none configured |
-| `Backend` | Backend access of the file based tools: `None` (default, offline), `Read`, `Write` |
-| `Tenants` | Allowlist of tenants for backend writes; empty: no backend writes. In `Tenant`, `Division` and `Employee` isolation only the isolated tenant is permitted |
+| `Backend` | Backend access of the file based tools: `None` (default, offline) or `Read`. Any other value, including `Write`, stops the start. |
 
 `WorkspaceContext.ResolvePath` resolves every path argument below a root and rejects:
 
@@ -134,7 +130,7 @@ Singleton populated at startup from `appsettings.json` or environment variables.
 
 ### `WorkspaceContext`
 
-Workspace isolation, read with `WorkspaceContext.FromConfiguration` from `McpServer:Regulator`. Provides `ResolvePath` (returns a `WorkspacePath` with root, full path, real path, relative path and repository), `IsRepositoryName` and `IsTenantAllowed`.
+Workspace isolation, read with `WorkspaceContext.FromConfiguration` from `McpServer:Regulator`. Provides `ResolvePath` (returns a `WorkspacePath` with root, full path, real path, relative path and repository) and `IsRepositoryName`.
 
 ### `IsolationToolBase`
 
