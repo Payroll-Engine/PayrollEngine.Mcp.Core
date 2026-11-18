@@ -12,7 +12,8 @@ namespace PayrollEngine.Mcp.Core;
 ///   (a) the deployment grants at least the required permission for that role, AND
 ///   (b) the role is applicable for the active isolation level (per Role x IsolationLevel matrix), AND
 ///   (c) when RequiredIsolationLevel is set: the active isolation level matches exactly.
-/// Tool classes without [ToolRole] are always registered.</summary>
+/// Tool classes without [ToolRole] are always registered.
+/// Roles defined by the server (<see cref="McpRoleDefinition"/>) use their own isolation levels instead of the matrix.</summary>
 public static class ToolRegistrar
 {
     /// <summary>Returns all tool types from the given assembly that pass the permission
@@ -20,7 +21,32 @@ public static class ToolRegistrar
     public static IEnumerable<Type> GetPermittedTypes(
         Assembly assembly,
         McpPermissions permissions,
-        IsolationLevel isolationLevel)
+        IsolationLevel isolationLevel) =>
+        GetPermittedTypes(assembly, permissions, isolationLevel, []);
+
+    /// <summary>Returns all tool types from the given assembly that pass the permission
+    /// and isolation-level compatibility filter, including tool classes of the roles defined by the server.</summary>
+    /// <param name="assembly">The tool assembly</param>
+    /// <param name="permissions">The role permissions</param>
+    /// <param name="isolationLevel">The active isolation level</param>
+    /// <param name="roles">The roles defined by the server</param>
+    /// <remarks>A tool class whose role is neither built-in nor defined is not registered.</remarks>
+    /// <exception cref="ArgumentException">A role is defined more than once</exception>
+    public static IEnumerable<Type> GetPermittedTypes(
+        Assembly assembly,
+        McpPermissions permissions,
+        IsolationLevel isolationLevel,
+        IEnumerable<McpRoleDefinition> roles)
+    {
+        var definitions = McpPermissions.ToRoleMap(roles);
+        return FilterTypes(assembly, permissions, isolationLevel, definitions);
+    }
+
+    private static IEnumerable<Type> FilterTypes(
+        Assembly assembly,
+        McpPermissions permissions,
+        IsolationLevel isolationLevel,
+        Dictionary<string, McpRoleDefinition> definitions)
     {
         foreach (var type in assembly.GetTypes())
         {
@@ -38,10 +64,21 @@ public static class ToolRegistrar
                 continue;
             }
 
+            // a role the server does not define is never granted
+            McpRoleDefinition definition = null;
+            if (!roleAttr.IsBuiltInRole && !definitions.TryGetValue(roleAttr.RoleName, out definition))
+                continue;
+
             // exact isolation level required (overrides the compatibility matrix)
             if (roleAttr.RequiredIsolationLevel.HasValue)
             {
                 if (isolationLevel != roleAttr.RequiredIsolationLevel.Value)
+                    continue;
+            }
+            else if (definition != null)
+            {
+                // role defined by the server: its own isolation levels
+                if (!definition.IsApplicable(isolationLevel))
                     continue;
             }
             else
@@ -51,7 +88,7 @@ public static class ToolRegistrar
                     continue;
             }
 
-            if (permissions.IsGranted(roleAttr.Role, roleAttr.Required))
+            if (permissions.IsGranted(roleAttr.RoleName, roleAttr.Required))
                 yield return type;
         }
     }

@@ -120,6 +120,38 @@ Controls **which tools** are registered at startup. Each tool class is tagged wi
 | System | ✓ | ✓ | ✗ | ✗ |
 | Regulator | ✓ | ✓ | ✗ | ✗ |
 
+### Roles Defined by a Server
+
+A server can add own roles next to the built-in ones. A role definition names the role, the isolation levels at which it is applicable (instead of the matrix above) and whether its tools need a backend connection:
+
+```csharp
+var roles = new[]
+{
+    new McpRoleDefinition("Audit", [IsolationLevel.MultiTenant, IsolationLevel.Tenant])
+};
+
+var permissions = McpPermissions.FromConfiguration(configuration, roles);
+var toolTypes = ToolRegistrar.GetPermittedTypes(assembly, permissions, isolationLevel, roles);
+```
+
+```csharp
+[McpServerToolType]
+[ToolRole("Audit", McpPermission.Read)]
+public sealed class AuditTools(PayrollHttpClient http, IsolationContext iso)
+    : ToolBase(http, iso) { ... }
+```
+
+| Rule | Behaviour |
+|:-----|:----------|
+| Name | A letter followed by letters or digits; not a built-in role name |
+| Permission | `McpServer:Permissions:<Name>`, default `None` — a role must be granted explicitly |
+| Isolation | The levels of the definition; `RequiredIsolationLevel` of the attribute still overrides them |
+| Undefined role | A tool class whose role the server does not define is not registered |
+| Built-in name | `[ToolRole("Payroll")]` selects the built-in role |
+| Checks in tools | `IsGranted(string roleName, McpPermission required)` in `IsolationToolBase`, `McpPermissions.IsGranted(string, …)` |
+
+The backend requirement (`RequiresBackend`) is evaluated by the host when it decides whether a backend connection is needed.
+
 ---
 
 ## Architecture
@@ -171,7 +203,7 @@ File based tool classes take only `IsolationContext`, call `ResolveWorkspacePath
 Scans an assembly for classes decorated with `[McpServerToolType]` and filters them by:
 
 1. `[ToolRole]` attribute — role and minimum permission check
-2. Role × IsolationLevel compatibility matrix
+2. Role × IsolationLevel compatibility matrix (roles defined by the server: the levels of their `McpRoleDefinition`)
 
 Classes without `[ToolRole]` are always registered (e.g. `ServerInfoTools`).
 

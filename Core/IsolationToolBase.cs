@@ -27,6 +27,13 @@ public abstract class IsolationToolBase(IsolationContext isolation)
     protected bool IsGranted(McpRole role, McpPermission required) =>
         Isolation.Permissions.IsGranted(role, required);
 
+    /// <summary>Returns true if the deployment grants at least the required permission for the role
+    /// (built-in or defined by the server).</summary>
+    /// <param name="roleName">The role name</param>
+    /// <param name="required">The minimum required permission</param>
+    protected bool IsGranted(string roleName, McpPermission required) =>
+        Isolation.Permissions.IsGranted(roleName, required);
+
     #endregion
 
     #region Workspace
